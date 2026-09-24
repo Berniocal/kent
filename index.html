@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b5d43">
+<title>Kent</title>
+<style>
+:root{
+  --bg:#0c6648; --bg2:#084e39; --panel:rgba(255,255,255,.075);
+  --line:rgba(255,255,255,.17); --text:#fff; --muted:rgba(255,255,255,.68);
+  --card:#fffdf8; --ink:#171717; --red:#c8323a; --accent:#f1c44d;
+  --danger:#ff6b6b; --shadow:0 12px 28px rgba(0,0,0,.23);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg2);color:var(--text)}
+body{min-height:100dvh;background:radial-gradient(circle at 50% 28%,rgba(255,255,255,.08),transparent 34%),linear-gradient(180deg,var(--bg),var(--bg2));overflow-x:hidden}
+button,input{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.app{width:min(100%,760px);min-height:100dvh;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px max(18px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;justify-content:space-between;min-height:44px}
+.brand{font-size:26px;font-weight:900;letter-spacing:.06em}
+.small-top{color:var(--muted);font-size:13px;font-weight:700}
+.screen{flex:1;display:flex;flex-direction:column;justify-content:center}
+.panel{border:1px solid var(--line);background:var(--panel);border-radius:28px;padding:22px}
+.home{gap:14px}
+.title{font-size:34px;line-height:1.05;font-weight:900;margin:0 0 4px;text-align:center}
+.subtitle{text-align:center;color:var(--muted);margin:0 0 20px}
+.field{width:100%;min-height:54px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.1);color:#fff;padding:0 16px;outline:none;font-weight:750}
+.field::placeholder{color:rgba(255,255,255,.45)}
+.field:focus{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.13)}
+.btn{min-height:54px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.1);color:#fff;font-weight:850;padding:0 16px}
+.btn:active{transform:scale(.985)}
+.btn.primary{background:#fff;color:#154b3a;border-color:#fff}
+.btn.accent{background:var(--accent);color:#183f33;border-color:var(--accent)}
+.btn.danger{background:rgba(255,107,107,.15);border-color:rgba(255,107,107,.38)}
+.btn:disabled{opacity:.42;cursor:default;transform:none}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sep{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin:3px 0}
+.sep:before,.sep:after{content:"";height:1px;background:var(--line);flex:1}
+.message{min-height:22px;text-align:center;color:var(--muted);font-size:14px;font-weight:700}
+.message.error{color:#ffd0d0}
+.room-head{text-align:center;margin-bottom:18px}
+.room-code{font-size:42px;font-weight:950;letter-spacing:.12em;margin:4px 0 6px}
+.room-label{font-size:12px;text-transform:uppercase;letter-spacing:.14em;font-weight:800;color:var(--muted)}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.player{min-height:78px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.06);padding:12px;display:flex;flex-direction:column;justify-content:center}
+.player.me{outline:2px solid rgba(241,196,77,.75)}
+.player.empty{color:var(--muted)}
+.player-num{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:800}
+.player-name{font-size:17px;font-weight:850;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.team-line{font-size:12px;color:var(--muted);margin-top:2px}
+.lobby-actions{display:grid;gap:10px}
+.game{justify-content:flex-start}
+.gamebar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.game-room{font-size:13px;font-weight:800;color:var(--muted)}
+.score{display:flex;gap:7px;align-items:center;font-weight:900}
+.score span{display:inline-grid;place-items:center;min-width:36px;height:30px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.08)}
+.status{min-height:29px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:750;color:var(--muted)}
+.status.strong{color:#fff;font-size:19px}
+.table-area{flex:1;min-height:280px;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:28px;padding:18px 14px;display:flex;flex-direction:column;justify-content:center;gap:15px}
+.label{text-align:center;font-size:11px;font-weight:850;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.card{position:relative;aspect-ratio:.69;border:0;border-radius:15px;background:var(--card);box-shadow:var(--shadow);padding:0;color:var(--ink);transition:transform .12s,box-shadow .12s,outline .12s;user-select:none;overflow:hidden}
+.card:active{transform:translateY(2px) scale(.985)}
+.card.selected{transform:translateY(-7px);outline:3px solid var(--accent);box-shadow:0 18px 32px rgba(0,0,0,.32)}
+.card.red{color:var(--red)}
+.corner{position:absolute;top:8px;left:9px;display:flex;flex-direction:column;align-items:center;line-height:.92;font-weight:900;font-size:clamp(17px,5vw,24px)}
+.corner.bottom{top:auto;left:auto;right:9px;bottom:8px;transform:rotate(180deg)}
+.corner .suit{font-size:.78em;margin-top:4px}
+.center-suit{position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(34px,10vw,62px);line-height:1}
+.hand-wrap{display:flex;flex-direction:column;gap:11px;padding-top:3px}
+.game-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.game-actions .btn{padding:0 8px;font-size:14px}
+.event-overlay{position:fixed;inset:0;background:rgba(4,30,22,.76);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:22px;z-index:5}
+.event-card{width:min(100%,420px);text-align:center;background:#0b553e;border:1px solid rgba(255,255,255,.2);border-radius:28px;padding:28px 22px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.event-big{font-size:36px;font-weight:950;letter-spacing:.03em}
+.event-sub{margin:8px 0 22px;color:var(--muted);font-weight:700}
+.setup{font-size:14px;line-height:1.45}
+.setup code{display:block;white-space:pre-wrap;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0;color:#fff}
+.toast{position:fixed;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#fff;color:#174838;padding:11px 16px;border-radius:999px;font-weight:800;opacity:0;pointer-events:none;transition:.18s;z-index:20;box-shadow:0 12px 35px rgba(0,0,0,.25)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(min-width:600px){.app{padding-left:28px;padding-right:28px}.cards{gap:15px}.table-area{padding:28px}.card{border-radius:18px}}
+@media(max-width:390px){.app{padding-left:10px;padding-right:10px;gap:13px}.panel{padding:18px 14px}.cards{gap:6px}.table-area{padding:15px 9px;min-height:255px}.card{border-radius:12px}.corner{top:6px;left:7px}.corner.bottom{right:7px;bottom:6px}.game-actions{gap:6px}.game-actions .btn{font-size:12px;min-height:49px}.room-code{font-size:36px}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <div class="brand">KENT</div>
+    <div class="small-top" id="topInfo"></div>
+  </header>
+
+  <section class="screen home" id="homeScreen">
+    <div class="panel">
+      <h1 class="title">Kent</h1>
+      <p class="subtitle">Online hra</p>
+      <input class="field" id="nameInput" maxlength="16" placeholder="Tvoje jméno" autocomplete="nickname">
+      <div style="height:10px"></div>
+      <button class="btn primary" id="createBtn">Založit hru</button>
+      <div class="sep">nebo</div>
+      <input class="field" id="roomInput" maxlength="6" placeholder="Kód místnosti" inputmode="text" autocapitalize="characters">
+      <div style="height:10px"></div>
+      <button class="btn" id="joinBtn">Připojit se</button>
+      <div class="message" id="homeMessage"></div>
+    </div>
+  </section>
+
+  <section class="screen hidden" id="lobbyScreen">
+    <div class="panel">
+      <div class="room-head">
+        <div class="room-label">Místnost</div>
+        <div class="room-code" id="roomCode"></div>
+        <button class="btn" id="shareBtn" style="min-height:44px">Sdílet odkaz</button>
+      </div>
+      <div class="players" id="playersList"></div>
+      <div class="lobby-actions">
+        <button class="btn primary hidden" id="startBtn">Začít hru</button>
+        <button class="btn danger" id="leaveBtn">Opustit</button>
+      </div>
+      <div class="message" id="lobbyMessage"></div>
+    </div>
+  </section>
+
+  <section class="screen game hidden" id="gameScreen">
+    <div class="gamebar">
+      <div class="game-room" id="gameRoom"></div>
+      <div class="score"><span id="scoreA">0</span>:<span id="scoreB">0</span></div>
+    </div>
+    <div class="status" id="status">Vyber kartu</div>
+
+    <section class="table-area">
+      <div class="label">Stůl</div>
+      <div class="cards" id="tableCards"></div>
+    </section>
+
+    <section class="hand-wrap">
+      <div class="label" id="handLabel">Tvoje karty</div>
+      <div class="cards" id="handCards"></div>
+      <div class="game-actions">
+        <button class="btn" id="newTableBtn">Nové karty</button>
+        <button class="btn accent" id="kentBtn">KENT!</button>
+        <button class="btn" id="contraBtn">KONTRA</button>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div class="event-overlay hidden" id="eventOverlay">
+  <div class="event-card">
+    <div class="event-big" id="eventTitle">KENT!</div>
+    <div class="event-sub" id="eventText"></div>
+    <button class="btn primary hidden" id="nextRoundBtn">Další kolo</button>
+    <button class="btn primary hidden" id="newGameBtn">Nová hra</button>
+  </div>
+</div>
+
+<div class="event-overlay hidden" id="setupOverlay">
+  <div class="event-card setup">
+    <div class="event-big" style="font-size:26px">Firebase</div>
+    <div class="event-sub">Doplň konfiguraci projektu v HTML.</div>
+    <code>const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  databaseURL: "...",
+  projectId: "...",
+  appId: "..."
+};</code>
+    <div style="color:var(--muted)">Pak zapni Anonymous Authentication a Realtime Database.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+  getDatabase, ref, get, set, update, remove, onValue, runTransaction, onDisconnect
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+/* =========================================================
+   DOPLŇ JEN TUTO KONFIGURACI Z FIREBASE CONSOLE
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCr3B9kLYg6qLERN1MsLm-fxRQLO5GUzmM",
+  authDomain: "kent-8de74.firebaseapp.com",
+  databaseURL: "https://kent-8de74-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "kent-8de74",
+  storageBucket: "kent-8de74.firebasestorage.app",
+  messagingSenderId: "116392815664",
+  appId: "1:116392815664:web:de6747adea482ff8e111f5"
+};
+/* ========================================================= */
+
+const ROOT = "kentRooms";
+const WIN_SCORE = 5;
+const suits = ["♠","♥","♦","♣"];
+const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+
+const $ = id => document.getElementById(id);
+const homeScreen=$("homeScreen"), lobbyScreen=$("lobbyScreen"), gameScreen=$("gameScreen");
+const setupOverlay=$("setupOverlay"), eventOverlay=$("eventOverlay");
+const homeMessage=$("homeMessage"), lobbyMessage=$("lobbyMessage"), statusEl=$("status");
+const handEl=$("handCards"), tableEl=$("tableCards"), playersList=$("playersList");
+const nameInput=$("nameInput"), roomInput=$("roomInput");
+const startBtn=$("startBtn"), newTableBtn=$("newTableBtn");
+const toastEl=$("toast");
+
+let app, auth, db, uid=null;
+let roomCode=null, roomData=null, roomUnsub=null;
+let selectedHand=null, selectedTable=null;
+let pendingRoomFromUrl = new URL(location.href).searchParams.get("room")?.toUpperCase() || "";
+
+function configReady(){
+  return firebaseConfig.apiKey && firebaseConfig.apiKey !== "DOPLNIT"
+    && firebaseConfig.databaseURL && firebaseConfig.databaseURL !== "DOPLNIT";
+}
+
+function toast(text){
+  toastEl.textContent=text;
+  toastEl.classList.add("show");
+  setTimeout(()=>toastEl.classList.remove("show"),1500);
+}
+
+function showScreen(which){
+  homeScreen.classList.toggle("hidden",which!=="home");
+  lobbyScreen.classList.toggle("hidden",which!=="lobby");
+  gameScreen.classList.toggle("hidden",which!=="game");
+}
+
+function message(el,text,error=false){
+  el.textContent=text||"";
+  el.classList.toggle("error",!!error);
+}
+
+function normalizeName(){
+  return nameInput.value.trim().replace(/\s+/g," ").slice(0,16) || "Hráč";
+}
+
+function randomCode(){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s="";
+  for(let i=0;i<5;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+function makeDeck(){
+  return suits.flatMap(suit=>ranks.map(rank=>({rank,suit})));
+}
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function isRed(c){return c.suit==="♥"||c.suit==="♦"}
+function hasFour(hand){
+  return Array.isArray(hand)&&hand.length===4&&hand.every(c=>c.rank===hand[0]?.rank);
+}
+function teamOfSeat(seat){return seat%2===0?"A":"B"}
+function mateSeat(seat){return seat===0?2:seat===2?0:seat===1?3:1}
+
+function cardHtml(card){
+  return `<span class="corner"><span>${card.rank}</span><span class="suit">${card.suit}</span></span>
+          <span class="center-suit">${card.suit}</span>
+          <span class="corner bottom"><span>${card.rank}</span><span class="suit">${card.suit}</span></span>`;
+}
+
+function playersArray(room=roomData){
+  if(!room?.players) return [];
+  return Object.entries(room.players).map(([id,p])=>({id,...p})).sort((a,b)=>a.seat-b.seat);
+}
+
+function me(){return roomData?.players?.[uid] || null}
+function amHost(){return roomData?.hostUid===uid}
+
+function renderLobby(){
+  if(!roomData) return;
+  $("roomCode").textContent=roomCode;
+  playersList.innerHTML="";
+  const bySeat=new Map(playersArray().map(p=>[p.seat,p]));
+  for(let seat=0;seat<4;seat++){
+    const p=bySeat.get(seat);
+    const div=document.createElement("div");
+    div.className="player "+(p?.id===uid?"me ":"")+(p?"":"empty");
+    div.innerHTML=p
+      ? `<div class="player-num">Hráč ${seat+1} · Tým ${teamOfSeat(seat)}</div><div class="player-name">${escapeHtml(p.name)}</div><div class="team-line">${p.online===false?"odpojen":"online"}</div>`
+      : `<div class="player-num">Hráč ${seat+1}</div><div class="player-name">Čeká se…</div><div class="team-line">Tým ${teamOfSeat(seat)}</div>`;
+    playersList.appendChild(div);
+  }
+  const count=playersArray().length;
+  startBtn.classList.toggle("hidden",!amHost());
+  startBtn.disabled=count!==4;
+  message(lobbyMessage,count===4?"Všichni jsou připraveni.":`${count}/4 hráči`);
+}
+
+function renderGame(){
+  if(!roomData?.game || !me()) return;
+  const g=roomData.game;
+  const myHand=g.hands?.[uid] || [];
+  $("gameRoom").textContent=`${roomCode} · Tým ${teamOfSeat(me().seat)}`;
+  $("scoreA").textContent=g.score?.A ?? 0;
+  $("scoreB").textContent=g.score?.B ?? 0;
+  $("handLabel").textContent=`Tvoje karty · ${me().name}`;
+
+  tableEl.innerHTML="";
+  (g.table||[]).forEach((card,i)=>{
+    const b=document.createElement("button");
+    b.className=`card ${isRed(card)?"red":""} ${selectedTable===i?"selected":""}`;
+    b.innerHTML=cardHtml(card);
+    b.disabled=roomData.state!=="playing";
+    b.onclick=()=>selectTable(i);
+    tableEl.appendChild(b);
+  });
+
+  handEl.innerHTML="";
+  myHand.forEach((card,i)=>{
+    const b=document.createElement("button");
+    b.className=`card ${isRed(card)?"red":""} ${selectedHand===i?"selected":""}`;
+    b.innerHTML=cardHtml(card);
+    b.disabled=roomData.state!=="playing";
+    b.onclick=()=>selectHand(i);
+    handEl.appendChild(b);
+  });
+
+  if(roomData.state==="playing"){
+    eventOverlay.classList.add("hidden");
+    statusEl.className="status";
+    if(selectedHand!==null) statusEl.textContent="Vyber kartu ze stolu";
+    else if(selectedTable!==null) statusEl.textContent="Vyber kartu z ruky";
+    else statusEl.textContent="Vyber kartu";
+  }
+
+  newTableBtn.classList.toggle("hidden",!amHost());
+  newTableBtn.disabled=roomData.state!=="playing";
+  $("kentBtn").disabled=roomData.state!=="playing";
+  $("contraBtn").disabled=roomData.state!=="playing";
+
+  if(roomData.state==="roundEnd"||roomData.state==="finished") showRoundEvent();
+}
+
+function renderFromRoom(data){
+  roomData=data;
+  if(!roomData){
+    leaveLocal();
+    message(homeMessage,"Místnost už neexistuje.",true);
+    return;
+  }
+  if(roomData.players?.[uid]===undefined){
+    leaveLocal();
+    message(homeMessage,"Nejsi v této místnosti.",true);
+    return;
+  }
+  if(roomData.state==="lobby"){
+    showScreen("lobby"); renderLobby();
+  }else{
+    showScreen("game"); renderGame();
+  }
+}
+
+function showRoundEvent(){
+  const ev=roomData?.game?.lastEvent;
+  if(!ev) return;
+  const myTeam=teamOfSeat(me().seat);
+  const won=ev.winnerTeam===myTeam;
+  $("eventTitle").textContent=roomData.state==="finished" ? (won?"VÍTĚZSTVÍ":"KONEC HRY") : ev.title;
+  $("eventText").textContent=`${ev.text} · ${roomData.game.score.A}:${roomData.game.score.B}`;
+  $("nextRoundBtn").classList.toggle("hidden",!amHost()||roomData.state!=="roundEnd");
+  $("newGameBtn").classList.toggle("hidden",!amHost()||roomData.state!=="finished");
+  eventOverlay.classList.remove("hidden");
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+async function createRoom(){
+  message(homeMessage,"");
+  if(!uid) return message(homeMessage,"Připojuji Firebase…");
+  const name=normalizeName();
+  let code;
+  for(let tries=0;tries<12;tries++){
+    code=randomCode();
+    const snap=await get(ref(db,`${ROOT}/${code}`));
+    if(!snap.exists()) break;
+    code=null;
+  }
+  if(!code) return message(homeMessage,"Nepodařilo se vytvořit místnost.",true);
+  const data={
+    createdAt:Date.now(),
+    hostUid:uid,
+    state:"lobby",
+    players:{[uid]:{name,seat:0,online:true,joinedAt:Date.now()}},
+    game:{score:{A:0,B:0},round:0}
+  };
+  await set(ref(db,`${ROOT}/${code}`),data);
+  await enterRoom(code);
+}
+
+async function joinRoom(codeRaw){
+  message(homeMessage,"");
+  if(!uid) return message(homeMessage,"Připojuji Firebase…");
+  const code=(codeRaw||roomInput.value).trim().toUpperCase();
+  if(!code) return message(homeMessage,"Zadej kód místnosti.",true);
+  const roomRef=ref(db,`${ROOT}/${code}`);
+  const snap=await get(roomRef);
+  if(!snap.exists()) return message(homeMessage,"Místnost neexistuje.",true);
+  const room=snap.val();
+
+  if(room.players?.[uid]){
+    await update(ref(db,`${ROOT}/${code}/players/${uid}`),{online:true,name:normalizeName()});
+    return enterRoom(code);
+  }
+  if(room.state!=="lobby") return message(homeMessage,"Hra už začala.",true);
+
+  const occupied=new Set(Object.values(room.players||{}).map(p=>p.seat));
+  let seat=[0,1,2,3].find(n=>!occupied.has(n));
+  if(seat===undefined) return message(homeMessage,"Místnost je plná.",true);
+
+  await set(ref(db,`${ROOT}/${code}/players/${uid}`),{
+    name:normalizeName(), seat, online:true, joinedAt:Date.now()
+  });
+  await enterRoom(code);
+}
+
+async function enterRoom(code){
+  if(roomUnsub) roomUnsub();
+  roomCode=code;
+  localStorage.setItem("kentName",normalizeName());
+  const u=new URL(location.href);
+  u.searchParams.set("room",code);
+  history.replaceState(null,"",u);
+  const onlineRef=ref(db,`${ROOT}/${code}/players/${uid}/online`);
+  await onDisconnect(onlineRef).set(false);
+  await set(onlineRef,true);
+  roomUnsub=onValue(ref(db,`${ROOT}/${code}`),snap=>renderFromRoom(snap.val()));
+}
+
+async function leaveRoom(){
+  if(roomCode&&uid){
+    try{await remove(ref(db,`${ROOT}/${roomCode}/players/${uid}`));}catch{}
+  }
+  leaveLocal();
+}
+
+function leaveLocal(){
+  if(roomUnsub){roomUnsub();roomUnsub=null}
+  roomCode=null; roomData=null; selectedHand=null; selectedTable=null;
+  const u=new URL(location.href); u.searchParams.delete("room"); history.replaceState(null,"",u);
+  eventOverlay.classList.add("hidden");
+  showScreen("home");
+}
+
+function buildRound(currentScore){
+  const deck=shuffle(makeDeck());
+  const hands={};
+  for(const p of playersArray()){
+    hands[p.id]=deck.splice(0,4);
+  }
+  return {
+    round:(roomData?.game?.round||0)+1,
+    score:currentScore||{A:0,B:0},
+    hands,
+    table:deck.splice(0,4),
+    deck,
+    discard:[],
+    lastEvent:null
+  };
+}
+
+async function startGame(resetScore=false){
+  if(!amHost() || playersArray().length!==4) return;
+  const score=resetScore?{A:0,B:0}:(roomData.game?.score||{A:0,B:0});
+  const game=buildRound(score);
+  await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game});
+  selectedHand=selectedTable=null;
+}
+
+function selectHand(i){
+  selectedHand=selectedHand===i?null:i;
+  if(selectedHand!==null&&selectedTable!==null) swapCards();
+  else renderGame();
+}
+function selectTable(i){
+  selectedTable=selectedTable===i?null:i;
+  if(selectedHand!==null&&selectedTable!==null) swapCards();
+  else renderGame();
+}
+
+async function swapCards(){
+  const hi=selectedHand, ti=selectedTable;
+  selectedHand=selectedTable=null;
+  await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
+    if(!room || room.state!=="playing") return;
+    const hand=room.game?.hands?.[uid];
+    const table=room.game?.table;
+    if(!Array.isArray(hand)||!Array.isArray(table)||!hand[hi]||!table[ti]) return;
+    const tmp=hand[hi]; hand[hi]=table[ti]; table[ti]=tmp;
+    room.game.turn=(room.game.turn||0)+1;
+    return room;
+  });
+}
+
+async function newTable(){
+  if(!amHost()) return;
+  await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
+    if(!room || room.state!=="playing") return;
+    const g=room.game;
+    g.discard=(g.discard||[]).concat(g.table||[]);
+    if((g.deck||[]).length<4){
+      g.deck=(g.deck||[]).concat(g.discard||[]);
+      g.discard=[];
+    }
+    g.table=g.deck.splice(0,4);
+    return room;
+  });
+}
+
+async function callKent(){
+  await resolveCall("kent");
+}
+async function callContra(){
+  await resolveCall("contra");
+}
+
+async function resolveCall(type){
+  await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
+    if(!room || room.state!=="playing") return;
+    const caller=room.players?.[uid];
+    if(!caller) return;
+    const callerTeam=teamOfSeat(caller.seat);
+    const otherTeam=callerTeam==="A"?"B":"A";
+    const allPlayers=Object.entries(room.players||{}).map(([id,p])=>({id,...p}));
+    let success=false;
+    let text="";
+    if(type==="kent"){
+      const mate=allPlayers.find(p=>p.seat===mateSeat(caller.seat));
+      success=!!mate && hasFour(room.game.hands?.[mate.id]);
+      text=success ? `${caller.name} správně hlásí KENT` : `${caller.name} hlásí KENT chybně`;
+    }else{
+      const opponentWithKent=allPlayers.find(p=>teamOfSeat(p.seat)!==callerTeam && hasFour(room.game.hands?.[p.id]));
+      success=!!opponentWithKent;
+      text=success ? `${caller.name} správně hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
+    }
+    const winnerTeam=success?callerTeam:otherTeam;
+    room.game.score=room.game.score||{A:0,B:0};
+    room.game.score[winnerTeam]=(room.game.score[winnerTeam]||0)+1;
+    room.game.lastEvent={
+      title:type==="kent"?"KENT!":"KONTRA!",
+      text,
+      winnerTeam,
+      by:uid,
+      time:Date.now()
+    };
+    room.state=room.game.score[winnerTeam]>=WIN_SCORE?"finished":"roundEnd";
+    return room;
+  });
+}
+
+async function nextRound(){
+  if(!amHost()) return;
+  const game=buildRound(roomData.game?.score||{A:0,B:0});
+  await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game});
+  selectedHand=selectedTable=null;
+  eventOverlay.classList.add("hidden");
+}
+
+$("createBtn").onclick=createRoom;
+$("joinBtn").onclick=()=>joinRoom();
+$("leaveBtn").onclick=leaveRoom;
+$("startBtn").onclick=()=>startGame(false);
+$("newTableBtn").onclick=newTable;
+$("kentBtn").onclick=callKent;
+$("contraBtn").onclick=callContra;
+$("nextRoundBtn").onclick=nextRound;
+$("newGameBtn").onclick=()=>startGame(true);
+
+$("shareBtn").onclick=async()=>{
+  const u=new URL(location.href); u.searchParams.set("room",roomCode);
+  try{
+    if(navigator.share) await navigator.share({title:"Kent",text:`Kent · místnost ${roomCode}`,url:u.href});
+    else{await navigator.clipboard.writeText(u.href);toast("Odkaz zkopírován");}
+  }catch{}
+};
+
+roomInput.addEventListener("input",()=>roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5));
+nameInput.value=localStorage.getItem("kentName")||"";
+if(pendingRoomFromUrl) roomInput.value=pendingRoomFromUrl;
+
+if(!configReady()){
+  setupOverlay.classList.remove("hidden");
+}else{
+  try{
+    app=initializeApp(firebaseConfig);
+    auth=getAuth(app);
+    db=getDatabase(app);
+    onAuthStateChanged(auth,user=>{
+      if(user){
+        uid=user.uid;
+        $("topInfo").textContent="online";
+        if(pendingRoomFromUrl){
+          pendingRoomFromUrl="";
+          joinRoom(roomInput.value);
+        }
+      }
+    });
+    signInAnonymously(auth).catch(err=>{
+      console.error(err);
+      message(homeMessage,"Firebase přihlášení selhalo.",true);
+    });
+  }catch(err){
+    console.error(err);
+    setupOverlay.classList.remove("hidden");
+  }
+}
+</script>
+</body>
+</html>

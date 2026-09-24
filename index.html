@@ -165,6 +165,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
     <div class="event-sub" id="eventText"></div>
     <button class="btn primary hidden" id="nextRoundBtn">Další kolo</button>
     <button class="btn primary hidden" id="newGameBtn">Nová hra</button>
+    <button class="btn danger hidden" id="endRoomEventBtn" style="margin-top:10px">Ukončit místnost</button>
   </div>
 </div>
 
@@ -432,6 +433,7 @@ function showRoundEvent(){
   $("eventText").textContent=`${ev.text} · ${roomData.game.score.A}:${roomData.game.score.B}`;
   $("nextRoundBtn").classList.toggle("hidden",!amHost()||roomData.state!=="roundEnd");
   $("newGameBtn").classList.toggle("hidden",!amHost()||roomData.state!=="finished");
+  $("endRoomEventBtn").classList.toggle("hidden",!amHost());
   eventOverlay.classList.remove("hidden");
 }
 
@@ -525,9 +527,15 @@ async function enterRoom(code){
   roomUnsub=onValue(ref(db,`${ROOT}/${code}`),snap=>renderFromRoom(snap.val()));
 }
 
+async function cancelPresence(code=roomCode){
+  if(!code || !uid || !db) return;
+  try{await onDisconnect(ref(db,`${ROOT}/${code}/players/${uid}/online`)).cancel()}catch{}
+}
+
 async function leaveRoom(){
   if(roomCode&&uid){
     const code=roomCode;
+    await cancelPresence(code);
     try{
       await runTransaction(ref(db,`${ROOT}/${code}`),room=>{
         if(!room) return room;
@@ -553,12 +561,15 @@ async function endRoom(){
   if(!amHost() || !roomCode) return;
   if(!confirm("Ukončit místnost pro všechny hráče?")) return;
   const code=roomCode;
+  await cancelPresence(code);
   try{await remove(ref(db,`${ROOT}/${code}`));}catch(err){console.error(err)}
   leaveLocal();
 }
 
 function leaveLocal(){
+  const oldCode=roomCode;
   if(roomUnsub){roomUnsub();roomUnsub=null}
+  if(oldCode) cancelPresence(oldCode).catch(()=>{});
   roomCode=null; roomData=null; selectedHand=null; selectedTable=null;
   const u=new URL(location.href); u.searchParams.delete("room"); history.replaceState(null,"",u);
   eventOverlay.classList.add("hidden");
@@ -689,6 +700,7 @@ $("joinBtn").onclick=()=>joinRoom();
 $("leaveBtn").onclick=leaveRoom;
 $("endRoomBtn").onclick=endRoom;
 $("endRoomGameBtn").onclick=endRoom;
+$("endRoomEventBtn").onclick=endRoom;
 $("startBtn").onclick=()=>startGame(false);
 $("newTableBtn").onclick=newTable;
 $("kentBtn").onclick=callKent;

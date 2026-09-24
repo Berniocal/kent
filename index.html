@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
@@ -51,6 +51,10 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .player-num{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:800}
 .player-name{font-size:17px;font-weight:850;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .team-line{font-size:12px;color:var(--muted);margin-top:2px}
+.team-picker{display:flex;gap:6px;margin-top:8px}
+.team-choice{min-width:38px;height:30px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-weight:900;padding:0 10px}
+.team-choice.active{background:var(--accent);border-color:var(--accent);color:#173f33}
+.team-choice:active{transform:scale(.97)}
 .lobby-actions{display:grid;gap:10px}
 .game{justify-content:flex-start}
 .gamebar{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -261,7 +265,7 @@ function hasFour(hand){
   return Array.isArray(hand)&&hand.length===4&&hand.every(c=>c.rank===hand[0]?.rank);
 }
 function teamOfSeat(seat){return seat%2===0?"A":"B"}
-function mateSeat(seat){return seat===0?2:seat===2?0:seat===1?3:1}
+function playerTeam(player){return player?.team || teamOfSeat(player?.seat ?? 0)}
 
 function cardHtml(card){
   return `<span class="corner"><span>${card.rank}</span><span class="suit">${card.suit}</span></span>
@@ -286,22 +290,49 @@ function renderLobby(){
     const p=bySeat.get(seat);
     const div=document.createElement("div");
     div.className="player "+(p?.id===uid?"me ":"")+(p?"":"empty");
-    div.innerHTML=p
-      ? `<div class="player-num">Hráč ${seat+1} · Tým ${teamOfSeat(seat)}</div><div class="player-name">${escapeHtml(p.name)}</div><div class="team-line">${p.online===false?"odpojen":"online"}</div>`
-      : `<div class="player-num">Hráč ${seat+1}</div><div class="player-name">Čeká se…</div><div class="team-line">Tým ${teamOfSeat(seat)}</div>`;
+    if(p){
+      const team=playerTeam(p);
+      div.innerHTML=`<div class="player-num">Hráč ${seat+1} · Tým ${team}</div><div class="player-name">${escapeHtml(p.name)}</div><div class="team-line">${p.online===false?"odpojen":"online"}</div>`;
+      if(amHost()){
+        const picker=document.createElement("div");
+        picker.className="team-picker";
+        for(const teamName of ["A","B"]){
+          const btn=document.createElement("button");
+          btn.className=`team-choice ${team===teamName?"active":""}`;
+          btn.textContent=`Tým ${teamName}`;
+          btn.onclick=()=>assignTeam(p.id,teamName);
+          picker.appendChild(btn);
+        }
+        div.appendChild(picker);
+      }
+    }else{
+      div.innerHTML=`<div class="player-num">Hráč ${seat+1}</div><div class="player-name">Čeká se…</div><div class="team-line">Volné místo</div>`;
+    }
     playersList.appendChild(div);
   }
-  const count=playersArray().length;
+  const list=playersArray();
+  const count=list.length;
+  const teamA=list.filter(p=>playerTeam(p)==="A").length;
+  const teamB=list.filter(p=>playerTeam(p)==="B").length;
+  const teamsReady=count===4 && teamA===2 && teamB===2;
   startBtn.classList.toggle("hidden",!amHost());
-  startBtn.disabled=count!==4;
-  message(lobbyMessage,count===4?"Všichni jsou připraveni.":`${count}/4 hráči`);
+  startBtn.disabled=!teamsReady;
+  if(count<4) message(lobbyMessage,`${count}/4 hráči`);
+  else if(!teamsReady) message(lobbyMessage,"Rozděl hráče do týmů 2 + 2.",true);
+  else message(lobbyMessage,"Všichni jsou připraveni.");
+}
+
+async function assignTeam(playerId,team){
+  if(!amHost() || roomData?.state!=="lobby" || !["A","B"].includes(team)) return;
+  if(!roomData?.players?.[playerId]) return;
+  await update(ref(db,`${ROOT}/${roomCode}/players/${playerId}`),{team});
 }
 
 function renderGame(){
   if(!roomData?.game || !me()) return;
   const g=roomData.game;
   const myHand=g.hands?.[uid] || [];
-  $("gameRoom").textContent=`${roomCode} · Tým ${teamOfSeat(me().seat)}`;
+  $("gameRoom").textContent=`${roomCode} · Tým ${playerTeam(me())}`;
   $("scoreA").textContent=g.score?.A ?? 0;
   $("scoreB").textContent=g.score?.B ?? 0;
   $("handLabel").textContent=`Tvoje karty · ${me().name}`;
@@ -364,7 +395,7 @@ function renderFromRoom(data){
 function showRoundEvent(){
   const ev=roomData?.game?.lastEvent;
   if(!ev) return;
-  const myTeam=teamOfSeat(me().seat);
+  const myTeam=playerTeam(me());
   const won=ev.winnerTeam===myTeam;
   $("eventTitle").textContent=roomData.state==="finished" ? (won?"VÍTĚZSTVÍ":"KONEC HRY") : ev.title;
   $("eventText").textContent=`${ev.text} · ${roomData.game.score.A}:${roomData.game.score.B}`;
@@ -393,7 +424,7 @@ async function createRoom(){
     createdAt:Date.now(),
     hostUid:uid,
     state:"lobby",
-    players:{[uid]:{name,seat:0,online:true,joinedAt:Date.now()}},
+    players:{[uid]:{name,seat:0,team:"A",online:true,joinedAt:Date.now()}},
     game:{score:{A:0,B:0},round:0}
   };
   await set(ref(db,`${ROOT}/${code}`),data);
@@ -421,7 +452,7 @@ async function joinRoom(codeRaw){
   if(seat===undefined) return message(homeMessage,"Místnost je plná.",true);
 
   await set(ref(db,`${ROOT}/${code}/players/${uid}`),{
-    name:normalizeName(), seat, online:true, joinedAt:Date.now()
+    name:normalizeName(), seat, team:teamOfSeat(seat), online:true, joinedAt:Date.now()
   });
   await enterRoom(code);
 }
@@ -472,7 +503,9 @@ function buildRound(currentScore){
 }
 
 async function startGame(resetScore=false){
-  if(!amHost() || playersArray().length!==4) return;
+  const list=playersArray();
+  const teamsReady=list.length===4 && list.filter(p=>playerTeam(p)==="A").length===2 && list.filter(p=>playerTeam(p)==="B").length===2;
+  if(!amHost() || !teamsReady) return;
   const score=resetScore?{A:0,B:0}:(roomData.game?.score||{A:0,B:0});
   const game=buildRound(score);
   await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game});
@@ -531,17 +564,17 @@ async function resolveCall(type){
     if(!room || room.state!=="playing") return;
     const caller=room.players?.[uid];
     if(!caller) return;
-    const callerTeam=teamOfSeat(caller.seat);
+    const callerTeam=playerTeam(caller);
     const otherTeam=callerTeam==="A"?"B":"A";
     const allPlayers=Object.entries(room.players||{}).map(([id,p])=>({id,...p}));
     let success=false;
     let text="";
     if(type==="kent"){
-      const mate=allPlayers.find(p=>p.seat===mateSeat(caller.seat));
+      const mate=allPlayers.find(p=>p.id!==uid && playerTeam(p)===callerTeam);
       success=!!mate && hasFour(room.game.hands?.[mate.id]);
       text=success ? `${caller.name} správně hlásí KENT` : `${caller.name} hlásí KENT chybně`;
     }else{
-      const opponentWithKent=allPlayers.find(p=>teamOfSeat(p.seat)!==callerTeam && hasFour(room.game.hands?.[p.id]));
+      const opponentWithKent=allPlayers.find(p=>playerTeam(p)!==callerTeam && hasFour(room.game.hands?.[p.id]));
       success=!!opponentWithKent;
       text=success ? `${caller.name} správně hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
     }

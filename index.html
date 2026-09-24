@@ -55,9 +55,13 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .team-choice{min-width:38px;height:30px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-weight:900;padding:0 10px}
 .team-choice.active{background:var(--accent);border-color:var(--accent);color:#173f33}
 .team-choice:active{transform:scale(.97)}
+.remove-player{height:30px;border-radius:9px;border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.12);color:#ffd6d6;font-size:12px;font-weight:900;padding:0 10px}
+.remove-player:active{transform:scale(.97)}
 .lobby-actions{display:grid;gap:10px}
 .game{justify-content:flex-start}
 .gamebar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gamebar-right{display:flex;align-items:center;gap:8px}
+.mini-danger{height:30px;border-radius:10px;border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.12);color:#ffd6d6;font-size:12px;font-weight:850;padding:0 10px}
 .game-room{font-size:13px;font-weight:800;color:var(--muted)}
 .score{display:flex;gap:7px;align-items:center;font-weight:900}
 .score span{display:inline-grid;place-items:center;min-width:36px;height:30px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.08)}
@@ -121,6 +125,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
       <div class="players" id="playersList"></div>
       <div class="lobby-actions">
         <button class="btn primary hidden" id="startBtn">Začít hru</button>
+        <button class="btn danger hidden" id="endRoomBtn">Ukončit místnost</button>
         <button class="btn danger" id="leaveBtn">Opustit</button>
       </div>
       <div class="message" id="lobbyMessage"></div>
@@ -130,7 +135,10 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
   <section class="screen game hidden" id="gameScreen">
     <div class="gamebar">
       <div class="game-room" id="gameRoom"></div>
-      <div class="score"><span id="scoreA">0</span>:<span id="scoreB">0</span></div>
+      <div class="gamebar-right">
+        <div class="score"><span id="scoreA">0</span>:<span id="scoreB">0</span></div>
+        <button class="mini-danger hidden" id="endRoomGameBtn">Ukončit</button>
+      </div>
     </div>
     <div class="status" id="status">Vyber kartu</div>
 
@@ -200,6 +208,7 @@ const firebaseConfig = {
 
 const ROOT = "kentRooms";
 const WIN_SCORE = 5;
+const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const suits = ["♠","♥","♦","♣"];
 const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -303,6 +312,13 @@ function renderLobby(){
           btn.onclick=()=>assignTeam(p.id,teamName);
           picker.appendChild(btn);
         }
+        if(p.id!==uid && p.online===false){
+          const removeBtn=document.createElement("button");
+          removeBtn.className="remove-player";
+          removeBtn.textContent="Odebrat";
+          removeBtn.onclick=()=>removePlayer(p.id);
+          picker.appendChild(removeBtn);
+        }
         div.appendChild(picker);
       }
     }else{
@@ -316,6 +332,7 @@ function renderLobby(){
   const teamB=list.filter(p=>playerTeam(p)==="B").length;
   const teamsReady=count===4 && teamA===2 && teamB===2;
   startBtn.classList.toggle("hidden",!amHost());
+  $("endRoomBtn").classList.toggle("hidden",!amHost());
   startBtn.disabled=!teamsReady;
   if(count<4) message(lobbyMessage,`${count}/4 hráči`);
   else if(!teamsReady) message(lobbyMessage,"Rozděl hráče do týmů 2 + 2.",true);
@@ -325,7 +342,20 @@ function renderLobby(){
 async function assignTeam(playerId,team){
   if(!amHost() || roomData?.state!=="lobby" || !["A","B"].includes(team)) return;
   if(!roomData?.players?.[playerId]) return;
-  await update(ref(db,`${ROOT}/${roomCode}/players/${playerId}`),{team});
+  await update(ref(db,`${ROOT}/${roomCode}`),{
+    [`players/${playerId}/team`]:team,
+    updatedAt:Date.now()
+  });
+}
+
+async function removePlayer(playerId){
+  if(!amHost() || roomData?.state!=="lobby" || playerId===uid) return;
+  const player=roomData?.players?.[playerId];
+  if(!player || player.online!==false) return;
+  await update(ref(db,`${ROOT}/${roomCode}`),{
+    [`players/${playerId}`]:null,
+    updatedAt:Date.now()
+  });
 }
 
 function renderGame(){
@@ -366,6 +396,7 @@ function renderGame(){
   }
 
   newTableBtn.classList.toggle("hidden",!amHost());
+  $("endRoomGameBtn").classList.toggle("hidden",!amHost());
   newTableBtn.disabled=roomData.state!=="playing";
   $("kentBtn").disabled=roomData.state!=="playing";
   $("contraBtn").disabled=roomData.state!=="playing";
@@ -408,9 +439,22 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
 
+async function cleanupOldRooms(){
+  const snap=await get(ref(db,ROOT));
+  if(!snap.exists()) return;
+  const now=Date.now();
+  const cleanup={};
+  for(const [code,room] of Object.entries(snap.val()||{})){
+    const lastActivity=room?.updatedAt || room?.createdAt || 0;
+    if(lastActivity && now-lastActivity>ROOM_TTL_MS) cleanup[code]=null;
+  }
+  if(Object.keys(cleanup).length) await update(ref(db,ROOT),cleanup);
+}
+
 async function createRoom(){
   message(homeMessage,"");
   if(!uid) return message(homeMessage,"Připojuji Firebase…");
+  try{await cleanupOldRooms();}catch(err){console.warn("Úklid starých místností se nepodařil",err)}
   const name=normalizeName();
   let code;
   for(let tries=0;tries<12;tries++){
@@ -420,11 +464,13 @@ async function createRoom(){
     code=null;
   }
   if(!code) return message(homeMessage,"Nepodařilo se vytvořit místnost.",true);
+  const now=Date.now();
   const data={
-    createdAt:Date.now(),
+    createdAt:now,
+    updatedAt:now,
     hostUid:uid,
     state:"lobby",
-    players:{[uid]:{name,seat:0,team:"A",online:true,joinedAt:Date.now()}},
+    players:{[uid]:{name,seat:0,team:"A",online:true,joinedAt:now}},
     game:{score:{A:0,B:0},round:0}
   };
   await set(ref(db,`${ROOT}/${code}`),data);
@@ -442,7 +488,11 @@ async function joinRoom(codeRaw){
   const room=snap.val();
 
   if(room.players?.[uid]){
-    await update(ref(db,`${ROOT}/${code}/players/${uid}`),{online:true,name:normalizeName()});
+    await update(roomRef,{
+      [`players/${uid}/online`]:true,
+      [`players/${uid}/name`]:normalizeName(),
+      updatedAt:Date.now()
+    });
     return enterRoom(code);
   }
   if(room.state!=="lobby") return message(homeMessage,"Hra už začala.",true);
@@ -451,8 +501,10 @@ async function joinRoom(codeRaw){
   let seat=[0,1,2,3].find(n=>!occupied.has(n));
   if(seat===undefined) return message(homeMessage,"Místnost je plná.",true);
 
-  await set(ref(db,`${ROOT}/${code}/players/${uid}`),{
-    name:normalizeName(), seat, team:teamOfSeat(seat), online:true, joinedAt:Date.now()
+  const now=Date.now();
+  await update(roomRef,{
+    [`players/${uid}`]:{name:normalizeName(),seat,team:teamOfSeat(seat),online:true,joinedAt:now},
+    updatedAt:now
   });
   await enterRoom(code);
 }
@@ -466,14 +518,42 @@ async function enterRoom(code){
   history.replaceState(null,"",u);
   const onlineRef=ref(db,`${ROOT}/${code}/players/${uid}/online`);
   await onDisconnect(onlineRef).set(false);
-  await set(onlineRef,true);
+  await update(ref(db,`${ROOT}/${code}`),{
+    [`players/${uid}/online`]:true,
+    updatedAt:Date.now()
+  });
   roomUnsub=onValue(ref(db,`${ROOT}/${code}`),snap=>renderFromRoom(snap.val()));
 }
 
 async function leaveRoom(){
   if(roomCode&&uid){
-    try{await remove(ref(db,`${ROOT}/${roomCode}/players/${uid}`));}catch{}
+    const code=roomCode;
+    try{
+      await runTransaction(ref(db,`${ROOT}/${code}`),room=>{
+        if(!room) return room;
+        const wasHost=room.hostUid===uid;
+        if(room.players) delete room.players[uid];
+        if(room.game?.hands) delete room.game.hands[uid];
+        const remaining=Object.entries(room.players||{}).map(([id,p])=>({id,...p})).sort((a,b)=>(a.seat??99)-(b.seat??99));
+        if(!remaining.length) return null;
+        if(wasHost) room.hostUid=remaining[0].id;
+        if(room.state!=="lobby"){
+          room.state="lobby";
+          room.game={score:room.game?.score||{A:0,B:0},round:room.game?.round||0};
+        }
+        room.updatedAt=Date.now();
+        return room;
+      });
+    }catch(err){console.error(err)}
   }
+  leaveLocal();
+}
+
+async function endRoom(){
+  if(!amHost() || !roomCode) return;
+  if(!confirm("Ukončit místnost pro všechny hráče?")) return;
+  const code=roomCode;
+  try{await remove(ref(db,`${ROOT}/${code}`));}catch(err){console.error(err)}
   leaveLocal();
 }
 
@@ -508,7 +588,7 @@ async function startGame(resetScore=false){
   if(!amHost() || !teamsReady) return;
   const score=resetScore?{A:0,B:0}:(roomData.game?.score||{A:0,B:0});
   const game=buildRound(score);
-  await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game});
+  await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game,updatedAt:Date.now()});
   selectedHand=selectedTable=null;
 }
 
@@ -533,6 +613,7 @@ async function swapCards(){
     if(!Array.isArray(hand)||!Array.isArray(table)||!hand[hi]||!table[ti]) return;
     const tmp=hand[hi]; hand[hi]=table[ti]; table[ti]=tmp;
     room.game.turn=(room.game.turn||0)+1;
+    room.updatedAt=Date.now();
     return room;
   });
 }
@@ -548,6 +629,7 @@ async function newTable(){
       g.discard=[];
     }
     g.table=g.deck.splice(0,4);
+    room.updatedAt=Date.now();
     return room;
   });
 }
@@ -589,6 +671,7 @@ async function resolveCall(type){
       time:Date.now()
     };
     room.state=room.game.score[winnerTeam]>=WIN_SCORE?"finished":"roundEnd";
+    room.updatedAt=Date.now();
     return room;
   });
 }
@@ -596,7 +679,7 @@ async function resolveCall(type){
 async function nextRound(){
   if(!amHost()) return;
   const game=buildRound(roomData.game?.score||{A:0,B:0});
-  await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game});
+  await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game,updatedAt:Date.now()});
   selectedHand=selectedTable=null;
   eventOverlay.classList.add("hidden");
 }
@@ -604,6 +687,8 @@ async function nextRound(){
 $("createBtn").onclick=createRoom;
 $("joinBtn").onclick=()=>joinRoom();
 $("leaveBtn").onclick=leaveRoom;
+$("endRoomBtn").onclick=endRoom;
+$("endRoomGameBtn").onclick=endRoom;
 $("startBtn").onclick=()=>startGame(false);
 $("newTableBtn").onclick=newTable;
 $("kentBtn").onclick=callKent;

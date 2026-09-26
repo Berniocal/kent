@@ -75,6 +75,32 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .card.selected{transform:translateY(-7px);outline:3px solid var(--accent);box-shadow:0 18px 32px rgba(0,0,0,.32)}
 .card.red{color:var(--red)}
 .move-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;max-width:92%;padding:7px 9px;border-radius:999px;background:rgba(13,48,38,.92);color:#fff;font-size:clamp(10px,2.8vw,13px);font-weight:900;line-height:1.15;white-space:nowrap;box-shadow:0 5px 14px rgba(0,0,0,.28);pointer-events:none}
+.create-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.option-box{min-height:54px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.07);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.option-box label,.option-title{font-size:12px;font-weight:850;letter-spacing:.04em;color:var(--muted)}
+.select{border:0;outline:0;background:rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:7px 9px;font-weight:850}
+.select option{color:#111;background:#fff}
+.toggle-box{cursor:pointer;justify-content:center}
+.toggle-box input{width:20px;height:20px;accent-color:var(--accent)}
+.toggle-box span{font-size:14px;font-weight:850}
+.room-meta{text-align:center;color:var(--muted);font-size:13px;font-weight:750;margin-top:2px}
+#lobbyScreen{justify-content:flex-start;padding-top:8px}
+.remote-lobby{border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:18px;padding:12px;margin:0 0 14px}
+.remote-title{text-align:center;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.emoji-teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.emoji-team{border:1px solid var(--line);border-radius:15px;padding:10px;background:rgba(255,255,255,.04);text-align:center}
+.emoji-team-head{font-size:12px;font-weight:850;color:var(--muted)}
+.emoji-current{font-size:30px;line-height:1.2;min-height:38px;margin:3px 0 7px}
+.emoji-options{display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
+.emoji-choice{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.07);font-size:20px;padding:0;color:#fff}
+.emoji-choice.active{background:var(--accent);border-color:var(--accent)}
+.emoji-choice:disabled{opacity:.28;cursor:default}
+.signal-btn{margin-top:2px;background:rgba(241,196,77,.18);border-color:rgba(241,196,77,.55);font-size:16px}
+.signal-corner{position:fixed;z-index:4;top:max(76px,calc(env(safe-area-inset-top) + 64px));right:14px;width:64px;height:64px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:rgba(5,43,31,.82);backdrop-filter:blur(8px);display:grid;place-items:center;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:opacity .12s,transform .12s;pointer-events:none}
+.signal-corner.hidden{display:none!important}
+.signal-corner .signal-emoji{font-size:38px;line-height:1}
+.signal-corner.real{outline:2px solid rgba(241,196,77,.8);transform:scale(1.05)}
+@media(max-width:430px){.create-options{grid-template-columns:1fr}.emoji-choice{width:32px;height:32px;font-size:19px}.signal-corner{width:58px;height:58px;border-radius:18px;top:max(72px,calc(env(safe-area-inset-top) + 60px));right:10px}.signal-corner .signal-emoji{font-size:34px}}
 .corner{position:absolute;top:8px;left:9px;display:flex;flex-direction:column;align-items:center;line-height:.92;font-weight:900;font-size:clamp(17px,5vw,24px)}
 .corner.bottom{top:auto;left:auto;right:9px;bottom:8px;transform:rotate(180deg)}
 .corner .suit{font-size:.78em;margin-top:4px}
@@ -106,7 +132,18 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
       <h1 class="title">Kent</h1>
       <p class="subtitle">Online hra</p>
       <input class="field" id="nameInput" maxlength="16" placeholder="Tvoje jméno" autocomplete="nickname">
-      <div style="height:10px"></div>
+      <div class="create-options">
+        <div class="option-box">
+          <span class="option-title">Hráči</span>
+          <select class="select" id="playerCountInput" aria-label="Počet hráčů">
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+        <label class="option-box toggle-box"><input type="checkbox" id="remoteInput"><span>Hrajeme na dálku</span></label>
+      </div>
       <button class="btn primary" id="createBtn">Založit hru</button>
       <div class="sep">nebo</div>
       <input class="field" id="roomInput" maxlength="6" placeholder="Kód místnosti" inputmode="text" autocapitalize="characters">
@@ -121,9 +158,11 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
       <div class="room-head">
         <div class="room-label">Místnost</div>
         <div class="room-code" id="roomCode"></div>
-        <button class="btn" id="shareBtn" style="min-height:44px">Sdílet odkaz</button>
+        <div class="room-meta" id="roomMeta"></div>
+        <button class="btn" id="shareBtn" style="min-height:44px;margin-top:8px">Sdílet odkaz</button>
       </div>
       <div class="players" id="playersList"></div>
+      <div class="remote-lobby hidden" id="remoteLobby"></div>
       <div class="lobby-actions">
         <button class="btn primary hidden" id="startBtn">Začít hru</button>
         <button class="btn danger hidden" id="endRoomBtn">Ukončit místnost</button>
@@ -151,6 +190,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
     <section class="hand-wrap">
       <div class="label" id="handLabel">Tvoje karty</div>
       <div class="cards" id="handCards"></div>
+      <button class="btn signal-btn hidden" id="signalBtn">SIGNÁL</button>
       <div class="game-actions">
         <button class="btn" id="newTableBtn">Nové karty</button>
         <button class="btn accent" id="kentBtn">KENT!</button>
@@ -159,6 +199,8 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
     </section>
   </section>
 </main>
+
+<div class="signal-corner hidden" id="signalCorner"><span class="signal-emoji" id="signalEmoji"></span></div>
 
 <div class="event-overlay hidden" id="eventOverlay">
   <div class="event-card">
@@ -212,6 +254,11 @@ const ROOT = "kentRooms";
 const WIN_SCORE = 5;
 const MOVE_NOTICE_MS = 1400;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
+const SIGNAL_DURATION_MS = 2500;
+const DECOY_SLOT_MS = 2500;
+const DECOY_VISIBLE_MS = 1750;
+const EMOJI_CHOICES = ["🐸","🦊","🐼","🐙","🦄","🐝","🍎","🍋","🍀","⭐","🔥","🌙","⚽","🎲","🚀","💎"];
+const DECOY_EMOJIS = ["😀","😎","🤓","🥳","🤖","👻","🐶","🐱","🐵","🦁","🐯","🐨","🐧","🦋","🌻","🌈","☀️","❄️","🍓","🍉","🥝","🍕","🍪","🎈","🎯","🎸","🚲","✈️","🧩","🔔",...EMOJI_CHOICES];
 const suits = ["♠","♥","♦","♣"];
 const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -221,13 +268,15 @@ const setupOverlay=$("setupOverlay"), eventOverlay=$("eventOverlay");
 const homeMessage=$("homeMessage"), lobbyMessage=$("lobbyMessage"), statusEl=$("status");
 const handEl=$("handCards"), tableEl=$("tableCards"), playersList=$("playersList");
 const nameInput=$("nameInput"), roomInput=$("roomInput");
+const playerCountInput=$("playerCountInput"), remoteInput=$("remoteInput");
 const startBtn=$("startBtn"), newTableBtn=$("newTableBtn");
 const toastEl=$("toast");
 
 let app, auth, db, uid=null;
 let roomCode=null, roomData=null, roomUnsub=null;
 let selectedHand=null, selectedTable=null;
-let moveNoticeTimer=null;
+let moveNoticeTimer=null, signalTicker=null;
+let serverTimeOffset=0;
 let pendingRoomFromUrl = new URL(location.href).searchParams.get("room")?.toUpperCase() || "";
 
 function configReady(){
@@ -279,6 +328,22 @@ function hasFour(hand){
 }
 function teamOfSeat(seat){return seat%2===0?"A":"B"}
 function playerTeam(player){return player?.team || teamOfSeat(player?.seat ?? 0)}
+function otherTeam(team){return team==="A"?"B":"A"}
+function maxPlayers(room=roomData){
+  const n=Number(room?.maxPlayers)||4;
+  return [4,6,8,10].includes(n)?n:4;
+}
+function serverNow(){return Date.now()+serverTimeOffset}
+function hashString(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++) h=Math.imul(h^str.charCodeAt(i),16777619);
+  return h>>>0;
+}
+function activeRemoteSignal(room=roomData,now=serverNow()){
+  const sig=room?.game?.signal;
+  if(!room?.remoteMode || !sig || sig.resolved || Number(sig.expiresAt)<=now) return null;
+  return sig;
+}
 
 function cardHtml(card){
   return `<span class="corner"><span>${card.rank}</span><span class="suit">${card.suit}</span></span>
@@ -296,10 +361,13 @@ function amHost(){return roomData?.hostUid===uid}
 
 function renderLobby(){
   if(!roomData) return;
+  stopSignalTicker();
   $("roomCode").textContent=roomCode;
+  const limit=maxPlayers();
+  $("roomMeta").textContent=`${limit} hráčů · ${roomData.remoteMode?"na dálku":"u jednoho stolu"}`;
   playersList.innerHTML="";
   const bySeat=new Map(playersArray().map(p=>[p.seat,p]));
-  for(let seat=0;seat<4;seat++){
+  for(let seat=0;seat<limit;seat++){
     const p=bySeat.get(seat);
     const div=document.createElement("div");
     div.className="player "+(p?.id===uid?"me ":"")+(p?"":"empty");
@@ -330,17 +398,57 @@ function renderLobby(){
     }
     playersList.appendChild(div);
   }
+
+  renderRemoteLobby();
   const list=playersArray();
   const count=list.length;
+  const perTeam=limit/2;
   const teamA=list.filter(p=>playerTeam(p)==="A").length;
   const teamB=list.filter(p=>playerTeam(p)==="B").length;
-  const teamsReady=count===4 && teamA===2 && teamB===2;
+  const allOnline=list.every(p=>p.online!==false);
+  const teamsReady=count===limit && teamA===perTeam && teamB===perTeam && allOnline;
+  const emojiA=roomData.teamEmojis?.A;
+  const emojiB=roomData.teamEmojis?.B;
+  const remoteReady=!roomData.remoteMode || (!!emojiA && !!emojiB && emojiA!==emojiB);
   startBtn.classList.toggle("hidden",!amHost());
   $("endRoomBtn").classList.toggle("hidden",!amHost());
-  startBtn.disabled=!teamsReady;
-  if(count<4) message(lobbyMessage,`${count}/4 hráči`);
-  else if(!teamsReady) message(lobbyMessage,"Rozděl hráče do týmů 2 + 2.",true);
+  startBtn.disabled=!(teamsReady&&remoteReady);
+  if(count<limit) message(lobbyMessage,`${count}/${limit} hráčů`);
+  else if(!allOnline) message(lobbyMessage,"Některý hráč je odpojený.",true);
+  else if(teamA!==perTeam || teamB!==perTeam) message(lobbyMessage,`Rozděl hráče do týmů ${perTeam} + ${perTeam}.`,true);
+  else if(!remoteReady) message(lobbyMessage,"Vyberte znamení obou týmů.",true);
   else message(lobbyMessage,"Všichni jsou připraveni.");
+}
+
+function renderRemoteLobby(){
+  const box=$("remoteLobby");
+  if(!roomData?.remoteMode){ box.classList.add("hidden"); box.innerHTML=""; return; }
+  box.classList.remove("hidden");
+  const myTeam=playerTeam(me());
+  const emojis=roomData.teamEmojis||{};
+  box.innerHTML='<div class="remote-title">Znamení pro Kent</div><div class="emoji-teams" id="emojiTeams"></div>';
+  const wrap=$("emojiTeams");
+  for(const team of ["A","B"]){
+    const current=emojis[team]||"?";
+    const other=emojis[otherTeam(team)];
+    const card=document.createElement("div");
+    card.className="emoji-team";
+    card.innerHTML=`<div class="emoji-team-head">Tým ${team}</div><div class="emoji-current">${current}</div>`;
+    if(myTeam===team){
+      const opts=document.createElement("div");
+      opts.className="emoji-options";
+      for(const emoji of EMOJI_CHOICES){
+        const b=document.createElement("button");
+        b.className=`emoji-choice ${emojis[team]===emoji?"active":""}`;
+        b.textContent=emoji;
+        b.disabled=emoji===other;
+        b.onclick=()=>setTeamEmoji(team,emoji);
+        opts.appendChild(b);
+      }
+      card.appendChild(opts);
+    }
+    wrap.appendChild(card);
+  }
 }
 
 async function assignTeam(playerId,team){
@@ -352,6 +460,21 @@ async function assignTeam(playerId,team){
   });
 }
 
+async function setTeamEmoji(team,emoji){
+  if(roomData?.state!=="lobby" || !roomData?.remoteMode || !EMOJI_CHOICES.includes(emoji)) return;
+  if(playerTeam(me())!==team) return;
+  await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
+    if(!room || room.state!=="lobby" || !room.remoteMode) return;
+    const caller=room.players?.[uid];
+    if(!caller || playerTeam(caller)!==team) return;
+    room.teamEmojis=room.teamEmojis||{};
+    if(room.teamEmojis[otherTeam(team)]===emoji) return;
+    room.teamEmojis[team]=emoji;
+    room.updatedAt=Date.now();
+    return room;
+  });
+}
+
 async function removePlayer(playerId){
   if(!amHost() || roomData?.state!=="lobby" || playerId===uid) return;
   const player=roomData?.players?.[playerId];
@@ -359,6 +482,78 @@ async function removePlayer(playerId){
   await update(ref(db,`${ROOT}/${roomCode}`),{
     [`players/${playerId}`]:null,
     updatedAt:Date.now()
+  });
+}
+
+function stopSignalTicker(){
+  if(signalTicker){clearInterval(signalTicker);signalTicker=null}
+  $("signalCorner")?.classList.add("hidden");
+}
+
+function startSignalTicker(){
+  if(!signalTicker) signalTicker=setInterval(renderSignalCorner,120);
+  renderSignalCorner();
+}
+
+function renderSignalCorner(){
+  const corner=$("signalCorner"), emojiEl=$("signalEmoji");
+  if(!corner || !roomData?.remoteMode || roomData.state!=="playing"){
+    corner?.classList.add("hidden");
+    return;
+  }
+  const now=serverNow();
+  const sig=activeRemoteSignal(roomData,now);
+  const myTeam=playerTeam(me());
+  const signalBtn=$("signalBtn"), kentBtn=$("kentBtn"), contraBtn=$("contraBtn");
+  if(sig){
+    corner.classList.remove("hidden");
+    corner.classList.add("real");
+    emojiEl.textContent=sig.emoji||"";
+    signalBtn.disabled=true;
+    kentBtn.disabled=uid===sig.senderUid || myTeam!==sig.team;
+    contraBtn.disabled=myTeam===sig.team;
+    return;
+  }
+  corner.classList.remove("real");
+  signalBtn.disabled=false;
+  kentBtn.disabled=true;
+  contraBtn.disabled=true;
+  const phase=((now%DECOY_SLOT_MS)+DECOY_SLOT_MS)%DECOY_SLOT_MS;
+  if(phase>DECOY_VISIBLE_MS){corner.classList.add("hidden");return}
+  const excluded=new Set([roomData.teamEmojis?.A,roomData.teamEmojis?.B].filter(Boolean));
+  const pool=DECOY_EMOJIS.filter(e=>!excluded.has(e));
+  const slot=Math.floor(now/DECOY_SLOT_MS);
+  const idx=pool.length?hashString(`${roomCode}:${slot}`)%pool.length:0;
+  emojiEl.textContent=pool[idx]||"🙂";
+  corner.classList.remove("hidden");
+}
+
+async function sendSignal(){
+  if(!roomData?.remoteMode || roomData.state!=="playing") return;
+  const now=serverNow();
+  await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
+    if(!room || !room.remoteMode || room.state!=="playing") return;
+    const caller=room.players?.[uid];
+    if(!caller) return;
+    const current=room.game?.signal;
+    if(current && !current.resolved && Number(current.expiresAt)>now) return;
+    const team=playerTeam(caller);
+    const emoji=room.teamEmojis?.[team];
+    if(!emoji) return;
+    room.game=room.game||{};
+    room.game.signalSeq=(room.game.signalSeq||0)+1;
+    room.game.signal={
+      id:room.game.signalSeq,
+      team,
+      senderUid:uid,
+      senderName:caller.name||"Hráč",
+      emoji,
+      at:now,
+      expiresAt:now+SIGNAL_DURATION_MS,
+      resolved:false
+    };
+    room.updatedAt=now;
+    return room;
   });
 }
 
@@ -417,10 +612,24 @@ function renderGame(){
   newTableBtn.classList.toggle("hidden",!amHost());
   $("endRoomGameBtn").classList.toggle("hidden",!amHost());
   newTableBtn.disabled=roomData.state!=="playing";
-  $("kentBtn").disabled=roomData.state!=="playing";
-  $("contraBtn").disabled=roomData.state!=="playing";
 
-  if(roomData.state==="roundEnd"||roomData.state==="finished") showRoundEvent();
+  const remote=!!roomData.remoteMode;
+  const signalBtn=$("signalBtn");
+  signalBtn.classList.toggle("hidden",!remote);
+  signalBtn.textContent=`SIGNÁL ${roomData.teamEmojis?.[playerTeam(me())]||""}`.trim();
+  if(remote){
+    startSignalTicker();
+    renderSignalCorner();
+  }else{
+    stopSignalTicker();
+    $("kentBtn").disabled=roomData.state!=="playing";
+    $("contraBtn").disabled=roomData.state!=="playing";
+  }
+
+  if(roomData.state==="roundEnd"||roomData.state==="finished"){
+    stopSignalTicker();
+    showRoundEvent();
+  }
 }
 
 function renderFromRoom(data){
@@ -476,6 +685,8 @@ async function createRoom(){
   if(!uid) return message(homeMessage,"Připojuji Firebase…");
   try{await cleanupOldRooms();}catch(err){console.warn("Úklid starých místností se nepodařil",err)}
   const name=normalizeName();
+  const limit=Number(playerCountInput.value)||4;
+  const remoteMode=!!remoteInput.checked;
   let code;
   for(let tries=0;tries<12;tries++){
     code=randomCode();
@@ -490,6 +701,9 @@ async function createRoom(){
     updatedAt:now,
     hostUid:uid,
     state:"lobby",
+    maxPlayers:[4,6,8,10].includes(limit)?limit:4,
+    remoteMode,
+    teamEmojis:{},
     players:{[uid]:{name,seat:0,team:"A",online:true,joinedAt:now}},
     game:{score:{A:0,B:0},round:0}
   };
@@ -517,8 +731,9 @@ async function joinRoom(codeRaw){
   }
   if(room.state!=="lobby") return message(homeMessage,"Hra už začala.",true);
 
+  const limit=maxPlayers(room);
   const occupied=new Set(Object.values(room.players||{}).map(p=>p.seat));
-  let seat=[0,1,2,3].find(n=>!occupied.has(n));
+  let seat=Array.from({length:limit},(_,i)=>i).find(n=>!occupied.has(n));
   if(seat===undefined) return message(homeMessage,"Místnost je plná.",true);
 
   const now=Date.now();
@@ -585,6 +800,7 @@ async function endRoom(){
 }
 
 function leaveLocal(){
+  stopSignalTicker();
   const oldCode=roomCode;
   if(roomUnsub){roomUnsub();roomUnsub=null}
   if(oldCode) cancelPresence(oldCode).catch(()=>{});
@@ -597,9 +813,7 @@ function leaveLocal(){
 function buildRound(currentScore){
   const deck=shuffle(makeDeck());
   const hands={};
-  for(const p of playersArray()){
-    hands[p.id]=deck.splice(0,4);
-  }
+  for(const p of playersArray()) hands[p.id]=deck.splice(0,4);
   return {
     round:(roomData?.game?.round||0)+1,
     score:currentScore||{A:0,B:0},
@@ -607,14 +821,21 @@ function buildRound(currentScore){
     table:deck.splice(0,4),
     deck,
     discard:[],
-    lastEvent:null
+    lastMove:null,
+    lastEvent:null,
+    signal:null,
+    signalSeq:0
   };
 }
 
 async function startGame(resetScore=false){
   const list=playersArray();
-  const teamsReady=list.length===4 && list.filter(p=>playerTeam(p)==="A").length===2 && list.filter(p=>playerTeam(p)==="B").length===2;
-  if(!amHost() || !teamsReady) return;
+  const limit=maxPlayers();
+  const perTeam=limit/2;
+  const teamsReady=list.length===limit && list.every(p=>p.online!==false) && list.filter(p=>playerTeam(p)==="A").length===perTeam && list.filter(p=>playerTeam(p)==="B").length===perTeam;
+  const emojiA=roomData.teamEmojis?.A, emojiB=roomData.teamEmojis?.B;
+  const remoteReady=!roomData.remoteMode || (!!emojiA && !!emojiB && emojiA!==emojiB);
+  if(!amHost() || !teamsReady || !remoteReady) return;
   const score=resetScore?{A:0,B:0}:(roomData.game?.score||{A:0,B:0});
   const game=buildRound(score);
   await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game,updatedAt:Date.now()});
@@ -664,10 +885,12 @@ async function newTable(){
     const g=room.game;
     g.discard=(g.discard||[]).concat(g.table||[]);
     if((g.deck||[]).length<4){
-      g.deck=(g.deck||[]).concat(g.discard||[]);
+      g.deck=shuffle((g.deck||[]).concat(g.discard||[]));
       g.discard=[];
     }
+    if((g.deck||[]).length<4) return;
     g.table=g.deck.splice(0,4);
+    g.lastMove=null;
     room.updatedAt=Date.now();
     return room;
   });
@@ -681,36 +904,50 @@ async function callContra(){
 }
 
 async function resolveCall(type){
+  const now=serverNow();
   await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
     if(!room || room.state!=="playing") return;
     const caller=room.players?.[uid];
     if(!caller) return;
     const callerTeam=playerTeam(caller);
-    const otherTeam=callerTeam==="A"?"B":"A";
     const allPlayers=Object.entries(room.players||{}).map(([id,p])=>({id,...p}));
-    let success=false;
-    let text="";
-    if(type==="kent"){
-      const mate=allPlayers.find(p=>p.id!==uid && playerTeam(p)===callerTeam);
-      success=!!mate && hasFour(room.game.hands?.[mate.id]);
-      text=success ? `${caller.name} správně hlásí KENT` : `${caller.name} hlásí KENT chybně`;
+    let success=false, winnerTeam=null, text="";
+
+    if(room.remoteMode){
+      const sig=room.game?.signal;
+      if(!sig || sig.resolved || Number(sig.expiresAt)<=now) return;
+      if(type==="kent"){
+        if(callerTeam!==sig.team || uid===sig.senderUid) return;
+        success=hasFour(room.game.hands?.[sig.senderUid]);
+        winnerTeam=success?sig.team:otherTeam(sig.team);
+        text=success ? `${caller.name} poznal znamení a hlásí KENT` : `${caller.name} hlásí KENT chybně`;
+      }else{
+        if(callerTeam===sig.team) return;
+        success=hasFour(room.game.hands?.[sig.senderUid]);
+        winnerTeam=success?callerTeam:sig.team;
+        text=success ? `${caller.name} zachytil znamení a hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
+      }
+      sig.resolved=true;
+      sig.resolvedBy=uid;
+      sig.response=type;
+      sig.resolvedAt=now;
     }else{
-      const opponentWithKent=allPlayers.find(p=>playerTeam(p)!==callerTeam && hasFour(room.game.hands?.[p.id]));
-      success=!!opponentWithKent;
-      text=success ? `${caller.name} správně hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
+      if(type==="kent"){
+        success=allPlayers.some(p=>p.id!==uid && playerTeam(p)===callerTeam && hasFour(room.game.hands?.[p.id]));
+        winnerTeam=success?callerTeam:otherTeam(callerTeam);
+        text=success ? `${caller.name} správně hlásí KENT` : `${caller.name} hlásí KENT chybně`;
+      }else{
+        success=allPlayers.some(p=>playerTeam(p)!==callerTeam && hasFour(room.game.hands?.[p.id]));
+        winnerTeam=success?callerTeam:otherTeam(callerTeam);
+        text=success ? `${caller.name} správně hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
+      }
     }
-    const winnerTeam=success?callerTeam:otherTeam;
+
     room.game.score=room.game.score||{A:0,B:0};
     room.game.score[winnerTeam]=(room.game.score[winnerTeam]||0)+1;
-    room.game.lastEvent={
-      title:type==="kent"?"KENT!":"KONTRA!",
-      text,
-      winnerTeam,
-      by:uid,
-      time:Date.now()
-    };
+    room.game.lastEvent={title:type==="kent"?"KENT!":"KONTRA!",text,winnerTeam,by:uid,time:now};
     room.state=room.game.score[winnerTeam]>=WIN_SCORE?"finished":"roundEnd";
-    room.updatedAt=Date.now();
+    room.updatedAt=now;
     return room;
   });
 }
@@ -731,6 +968,7 @@ $("endRoomGameBtn").onclick=endRoom;
 $("endRoomEventBtn").onclick=endRoom;
 $("startBtn").onclick=()=>startGame(false);
 $("newTableBtn").onclick=newTable;
+$("signalBtn").onclick=sendSignal;
 $("kentBtn").onclick=callKent;
 $("contraBtn").onclick=callContra;
 $("nextRoundBtn").onclick=nextRound;
@@ -755,6 +993,7 @@ if(!configReady()){
     app=initializeApp(firebaseConfig);
     auth=getAuth(app);
     db=getDatabase(app);
+    onValue(ref(db,".info/serverTimeOffset"),snap=>{serverTimeOffset=Number(snap.val())||0});
     onAuthStateChanged(auth,user=>{
       if(user){
         uid=user.uid;

@@ -433,7 +433,7 @@ function renderRemoteLobby(){
     const other=emojis[otherTeam(team)];
     const card=document.createElement("div");
     card.className="emoji-team";
-    card.innerHTML=`<div class="emoji-team-head">Tým ${team}</div><div class="emoji-current">${current}</div>`;
+    card.innerHTML=`<div class="emoji-team-head">Tým ${team}</div><div class="emoji-current">${myTeam===team?current:"🔒"}</div>`;
     if(myTeam===team){
       const opts=document.createElement("div");
       opts.className="emoji-options";

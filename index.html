@@ -132,18 +132,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
       <h1 class="title">Kent</h1>
       <p class="subtitle">Online hra</p>
       <input class="field" id="nameInput" maxlength="16" placeholder="Tvoje jméno" autocomplete="nickname">
-      <div class="create-options">
-        <div class="option-box">
-          <span class="option-title">Hráči</span>
-          <select class="select" id="playerCountInput" aria-label="Počet hráčů">
-            <option value="4">4</option>
-            <option value="6">6</option>
-            <option value="8">8</option>
-            <option value="10">10</option>
-          </select>
-        </div>
-        <label class="option-box toggle-box"><input type="checkbox" id="remoteInput"><span>Hrajeme na dálku</span></label>
-      </div>
+      <div style="height:10px"></div>
       <button class="btn primary" id="createBtn">Založit hru</button>
       <div class="sep">nebo</div>
       <input class="field" id="roomInput" maxlength="6" placeholder="Kód místnosti" inputmode="text" autocapitalize="characters">
@@ -160,6 +149,18 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
         <div class="room-code" id="roomCode"></div>
         <div class="room-meta" id="roomMeta"></div>
         <button class="btn" id="shareBtn" style="min-height:44px;margin-top:8px">Sdílet odkaz</button>
+      </div>
+      <div class="create-options hidden" id="lobbySettings">
+        <div class="option-box">
+          <span class="option-title">Hráči</span>
+          <select class="select" id="lobbyPlayerCount" aria-label="Počet hráčů">
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+        <label class="option-box toggle-box"><input type="checkbox" id="lobbyRemote"><span>Hrajeme na dálku</span></label>
       </div>
       <div class="players" id="playersList"></div>
       <div class="remote-lobby hidden" id="remoteLobby"></div>
@@ -268,7 +269,7 @@ const setupOverlay=$("setupOverlay"), eventOverlay=$("eventOverlay");
 const homeMessage=$("homeMessage"), lobbyMessage=$("lobbyMessage"), statusEl=$("status");
 const handEl=$("handCards"), tableEl=$("tableCards"), playersList=$("playersList");
 const nameInput=$("nameInput"), roomInput=$("roomInput");
-const playerCountInput=$("playerCountInput"), remoteInput=$("remoteInput");
+const lobbyPlayerCount=$("lobbyPlayerCount"), lobbyRemote=$("lobbyRemote"), lobbySettings=$("lobbySettings");
 const startBtn=$("startBtn"), newTableBtn=$("newTableBtn");
 const toastEl=$("toast");
 
@@ -384,6 +385,11 @@ function renderLobby(){
   $("roomCode").textContent=roomCode;
   const limit=maxPlayers();
   $("roomMeta").textContent=`${limit} hráčů · ${roomData.remoteMode?"na dálku":"u jednoho stolu"}`;
+  lobbySettings.classList.toggle("hidden",!amHost());
+  lobbyPlayerCount.value=String(limit);
+  lobbyRemote.checked=!!roomData.remoteMode;
+  const joinedCount=playersArray().length;
+  for(const option of lobbyPlayerCount.options) option.disabled=Number(option.value)<joinedCount;
   playersList.innerHTML="";
   const bySeat=new Map(playersArray().map(p=>[p.seat,p]));
   for(let seat=0;seat<limit;seat++){
@@ -487,6 +493,41 @@ async function setTeamEmoji(team,emoji){
     room.teamEmojis[team]=emoji;
     room.updatedAt=Date.now();
     return room;
+  });
+}
+
+async function setLobbyPlayerCount(rawLimit){
+  const limit=Number(rawLimit);
+  if(!amHost() || roomData?.state!=="lobby" || ![4,6,8,10].includes(limit)) return;
+  if(playersArray().length>limit){
+    toast(`V místnosti už je ${playersArray().length} hráčů`);
+    renderLobby();
+    return;
+  }
+  await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
+    if(!room || room.state!=="lobby" || room.hostUid!==uid) return;
+    const entries=Object.entries(room.players||{}).sort((a,b)=>(a[1]?.seat??99)-(b[1]?.seat??99));
+    if(entries.length>limit) return;
+    const players={};
+    entries.forEach(([id,p],seat)=>{
+      players[id]={...p,seat,team:teamOfSeat(seat)};
+    });
+    room.players=players;
+    room.maxPlayers=limit;
+    const allowedTeams=Array.from({length:limit/2},(_,i)=>String.fromCharCode(65+i));
+    room.teamEmojis=Object.fromEntries(Object.entries(room.teamEmojis||{}).filter(([team])=>allowedTeams.includes(team)));
+    room.game=room.game||{};
+    room.game.score=emptyScore(limit);
+    room.updatedAt=Date.now();
+    return room;
+  });
+}
+
+async function setLobbyRemoteMode(enabled){
+  if(!amHost() || roomData?.state!=="lobby") return;
+  await update(ref(db,`${ROOT}/${roomCode}`),{
+    remoteMode:!!enabled,
+    updatedAt:Date.now()
   });
 }
 
@@ -699,8 +740,8 @@ async function createRoom(){
   if(!uid) return message(homeMessage,"Připojuji Firebase…");
   try{await cleanupOldRooms();}catch(err){console.warn("Úklid starých místností se nepodařil",err)}
   const name=normalizeName();
-  const limit=Number(playerCountInput.value)||4;
-  const remoteMode=!!remoteInput.checked;
+  const limit=4;
+  const remoteMode=false;
   let code;
   for(let tries=0;tries<12;tries++){
     code=randomCode();
@@ -1008,11 +1049,14 @@ $("kentBtn").onclick=callKent;
 $("contraBtn").onclick=callContra;
 $("nextRoundBtn").onclick=nextRound;
 $("newGameBtn").onclick=()=>startGame(true);
+lobbyPlayerCount.onchange=()=>setLobbyPlayerCount(lobbyPlayerCount.value);
+lobbyRemote.onchange=()=>setLobbyRemoteMode(lobbyRemote.checked);
 
 $("shareBtn").onclick=async()=>{
-  const u=new URL(location.href); u.searchParams.set("room",roomCode);
+  const u=new URL("https://bernio.cz/kent/");
+  u.searchParams.set("room",roomCode);
   try{
-    if(navigator.share) await navigator.share({title:"Kent",text:`Kent · místnost ${roomCode}`,url:u.href});
+    if(navigator.share) await navigator.share({url:u.href});
     else{await navigator.clipboard.writeText(u.href);toast("Odkaz zkopírován");}
   }catch{}
 };
@@ -1033,10 +1077,6 @@ if(!configReady()){
       if(user){
         uid=user.uid;
         $("topInfo").textContent="online";
-        if(pendingRoomFromUrl){
-          pendingRoomFromUrl="";
-          joinRoom(roomInput.value);
-        }
       }
     });
     signInAnonymously(auth).catch(err=>{

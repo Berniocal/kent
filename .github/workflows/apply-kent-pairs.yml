@@ -1,0 +1,36 @@
+name: Apply Kent paired teams
+
+on:
+  push:
+    paths:
+      - '.kent-pairs-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebuild Kent
+        run: |
+          cat .kent-pairs-1 .kent-pairs-2 .kent-pairs-3 | base64 -d | gzip -d > index.html
+          test "$(git hash-object index.html)" = "73e5e9be5d67b0dbc6fa229153298a98940ed97e"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text(encoding='utf-8')
+          m=re.search(r'<script type="module">(.*?)</script>',s,re.S)
+          assert m, 'module script not found'
+          Path('/tmp/kent-check.mjs').write_text(m.group(1),encoding='utf-8')
+          PY
+          node --check /tmp/kent-check.mjs
+      - name: Commit upgrade
+        run: |
+          git config user.name "Bernio"
+          git config user.email "jendabernard@gmail.com"
+          git add index.html
+          git rm .kent-pairs-1 .kent-pairs-2 .kent-pairs-3 .kent-pairs-trigger
+          git commit -m "Use fixed two-player teams in multiplayer Kent"
+          git push

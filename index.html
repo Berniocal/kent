@@ -63,7 +63,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .gamebar-right{display:flex;align-items:center;gap:8px}
 .mini-danger{height:30px;border-radius:10px;border:1px solid rgba(255,107,107,.4);background:rgba(255,107,107,.12);color:#ffd6d6;font-size:12px;font-weight:850;padding:0 10px}
 .game-room{font-size:13px;font-weight:800;color:var(--muted)}
-.score{display:flex;gap:7px;align-items:center;font-weight:900}
+.score{display:flex;gap:7px;align-items:center;justify-content:flex-end;flex-wrap:wrap;font-weight:900}
 .score span{display:inline-grid;place-items:center;min-width:36px;height:30px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.08)}
 .status{min-height:29px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:750;color:var(--muted)}
 .status.strong{color:#fff;font-size:19px}
@@ -87,7 +87,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 #lobbyScreen{justify-content:flex-start;padding-top:8px}
 .remote-lobby{border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:18px;padding:12px;margin:0 0 14px}
 .remote-title{text-align:center;font-size:12px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
-.emoji-teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.emoji-teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .emoji-team{border:1px solid var(--line);border-radius:15px;padding:10px;background:rgba(255,255,255,.04);text-align:center}
 .emoji-team-head{font-size:12px;font-weight:850;color:var(--muted)}
 .emoji-current{font-size:30px;line-height:1.2;min-height:38px;margin:3px 0 7px}
@@ -176,7 +176,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
     <div class="gamebar">
       <div class="game-room" id="gameRoom"></div>
       <div class="gamebar-right">
-        <div class="score"><span id="scoreA">0</span>:<span id="scoreB">0</span></div>
+        <div class="score" id="scoreBoard"></div>
         <button class="mini-danger hidden" id="endRoomGameBtn">Ukončit</button>
       </div>
     </div>
@@ -326,12 +326,31 @@ function isRed(c){return c.suit==="♥"||c.suit==="♦"}
 function hasFour(hand){
   return Array.isArray(hand)&&hand.length===4&&hand.every(c=>c.rank===hand[0]?.rank);
 }
-function teamOfSeat(seat){return seat%2===0?"A":"B"}
+function teamOfSeat(seat){return String.fromCharCode(65+Math.floor((Number(seat)||0)/2))}
 function playerTeam(player){return player?.team || teamOfSeat(player?.seat ?? 0)}
-function otherTeam(team){return team==="A"?"B":"A"}
 function maxPlayers(room=roomData){
   const n=Number(room?.maxPlayers)||4;
   return [4,6,8,10].includes(n)?n:4;
+}
+function teamNames(room=roomData){
+  return Array.from({length:maxPlayers(room)/2},(_,i)=>String.fromCharCode(65+i));
+}
+function emptyScore(roomOrLimit=roomData){
+  const limit=typeof roomOrLimit==="number"?roomOrLimit:maxPlayers(roomOrLimit);
+  return Object.fromEntries(Array.from({length:limit/2},(_,i)=>[String.fromCharCode(65+i),0]));
+}
+function scoreText(score={},room=roomData){
+  return teamNames(room).map(team=>`${team} ${score?.[team]??0}`).join(" · ");
+}
+function renderScoreBoard(score={}){
+  const board=$("scoreBoard");
+  if(!board) return;
+  board.innerHTML="";
+  for(const team of teamNames()) {
+    const span=document.createElement("span");
+    span.textContent=`${team} ${score?.[team]??0}`;
+    board.appendChild(span);
+  }
 }
 function serverNow(){return Date.now()+serverTimeOffset}
 function hashString(str){
@@ -377,7 +396,7 @@ function renderLobby(){
       if(amHost()){
         const picker=document.createElement("div");
         picker.className="team-picker";
-        for(const teamName of ["A","B"]){
+        for(const teamName of teamNames()){
           const btn=document.createElement("button");
           btn.className=`team-choice ${team===teamName?"active":""}`;
           btn.textContent=`Tým ${teamName}`;
@@ -402,21 +421,18 @@ function renderLobby(){
   renderRemoteLobby();
   const list=playersArray();
   const count=list.length;
-  const perTeam=limit/2;
-  const teamA=list.filter(p=>playerTeam(p)==="A").length;
-  const teamB=list.filter(p=>playerTeam(p)==="B").length;
+  const teams=teamNames();
   const allOnline=list.every(p=>p.online!==false);
-  const teamsReady=count===limit && teamA===perTeam && teamB===perTeam && allOnline;
-  const emojiA=roomData.teamEmojis?.A;
-  const emojiB=roomData.teamEmojis?.B;
-  const remoteReady=!roomData.remoteMode || (!!emojiA && !!emojiB && emojiA!==emojiB);
+  const teamsReady=count===limit && allOnline && teams.every(team=>list.filter(p=>playerTeam(p)===team).length===2);
+  const chosenEmojis=teams.map(team=>roomData.teamEmojis?.[team]).filter(Boolean);
+  const remoteReady=!roomData.remoteMode || (chosenEmojis.length===teams.length && new Set(chosenEmojis).size===teams.length);
   startBtn.classList.toggle("hidden",!amHost());
   $("endRoomBtn").classList.toggle("hidden",!amHost());
   startBtn.disabled=!(teamsReady&&remoteReady);
   if(count<limit) message(lobbyMessage,`${count}/${limit} hráčů`);
   else if(!allOnline) message(lobbyMessage,"Některý hráč je odpojený.",true);
-  else if(teamA!==perTeam || teamB!==perTeam) message(lobbyMessage,`Rozděl hráče do týmů ${perTeam} + ${perTeam}.`,true);
-  else if(!remoteReady) message(lobbyMessage,"Vyberte znamení obou týmů.",true);
+  else if(!teamsReady) message(lobbyMessage,"Každý tým musí mít přesně 2 hráče.",true);
+  else if(!remoteReady) message(lobbyMessage,"Každý tým musí vybrat jiné znamení.",true);
   else message(lobbyMessage,"Všichni jsou připraveni.");
 }
 
@@ -428,12 +444,11 @@ function renderRemoteLobby(){
   const emojis=roomData.teamEmojis||{};
   box.innerHTML='<div class="remote-title">Znamení pro Kent</div><div class="emoji-teams" id="emojiTeams"></div>';
   const wrap=$("emojiTeams");
-  for(const team of ["A","B"]){
+  for(const team of teamNames()){
     const current=emojis[team]||"?";
-    const other=emojis[otherTeam(team)];
     const card=document.createElement("div");
     card.className="emoji-team";
-    card.innerHTML=`<div class="emoji-team-head">Tým ${team}</div><div class="emoji-current">${myTeam===team?current:"🔒"}</div>`;
+    card.innerHTML=`<div class="emoji-team-head">Tým ${team}</div><div class="emoji-current">${current}</div>`;
     if(myTeam===team){
       const opts=document.createElement("div");
       opts.className="emoji-options";
@@ -441,7 +456,7 @@ function renderRemoteLobby(){
         const b=document.createElement("button");
         b.className=`emoji-choice ${emojis[team]===emoji?"active":""}`;
         b.textContent=emoji;
-        b.disabled=emoji===other;
+        b.disabled=Object.entries(emojis).some(([otherTeam,used])=>otherTeam!==team && used===emoji);
         b.onclick=()=>setTeamEmoji(team,emoji);
         opts.appendChild(b);
       }
@@ -452,7 +467,7 @@ function renderRemoteLobby(){
 }
 
 async function assignTeam(playerId,team){
-  if(!amHost() || roomData?.state!=="lobby" || !["A","B"].includes(team)) return;
+  if(!amHost() || roomData?.state!=="lobby" || !teamNames().includes(team)) return;
   if(!roomData?.players?.[playerId]) return;
   await update(ref(db,`${ROOT}/${roomCode}`),{
     [`players/${playerId}/team`]:team,
@@ -461,14 +476,14 @@ async function assignTeam(playerId,team){
 }
 
 async function setTeamEmoji(team,emoji){
-  if(roomData?.state!=="lobby" || !roomData?.remoteMode || !EMOJI_CHOICES.includes(emoji)) return;
+  if(roomData?.state!=="lobby" || !roomData?.remoteMode || !EMOJI_CHOICES.includes(emoji) || !teamNames().includes(team)) return;
   if(playerTeam(me())!==team) return;
   await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
     if(!room || room.state!=="lobby" || !room.remoteMode) return;
     const caller=room.players?.[uid];
     if(!caller || playerTeam(caller)!==team) return;
     room.teamEmojis=room.teamEmojis||{};
-    if(room.teamEmojis[otherTeam(team)]===emoji) return;
+    if(Object.entries(room.teamEmojis).some(([otherTeam,used])=>otherTeam!==team && used===emoji)) return;
     room.teamEmojis[team]=emoji;
     room.updatedAt=Date.now();
     return room;
@@ -520,7 +535,7 @@ function renderSignalCorner(){
   contraBtn.disabled=true;
   const phase=((now%DECOY_SLOT_MS)+DECOY_SLOT_MS)%DECOY_SLOT_MS;
   if(phase>DECOY_VISIBLE_MS){corner.classList.add("hidden");return}
-  const excluded=new Set([roomData.teamEmojis?.A,roomData.teamEmojis?.B].filter(Boolean));
+  const excluded=new Set(Object.values(roomData.teamEmojis||{}).filter(Boolean));
   const pool=DECOY_EMOJIS.filter(e=>!excluded.has(e));
   const slot=Math.floor(now/DECOY_SLOT_MS);
   const idx=pool.length?hashString(`${roomCode}:${slot}`)%pool.length:0;
@@ -562,8 +577,7 @@ function renderGame(){
   const g=roomData.game;
   const myHand=g.hands?.[uid] || [];
   $("gameRoom").textContent=`${roomCode} · Tým ${playerTeam(me())}`;
-  $("scoreA").textContent=g.score?.A ?? 0;
-  $("scoreB").textContent=g.score?.B ?? 0;
+  renderScoreBoard(g.score||{});
   $("handLabel").textContent=`Tvoje karty · ${me().name}`;
 
   const lastMove=g.lastMove;
@@ -657,7 +671,7 @@ function showRoundEvent(){
   const myTeam=playerTeam(me());
   const won=ev.winnerTeam===myTeam;
   $("eventTitle").textContent=roomData.state==="finished" ? (won?"VÍTĚZSTVÍ":"KONEC HRY") : ev.title;
-  $("eventText").textContent=`${ev.text} · ${roomData.game.score.A}:${roomData.game.score.B}`;
+  $("eventText").textContent=`${ev.text} · ${scoreText(roomData.game.score||{})}`;
   $("nextRoundBtn").classList.toggle("hidden",!amHost()||roomData.state!=="roundEnd");
   $("newGameBtn").classList.toggle("hidden",!amHost()||roomData.state!=="finished");
   $("endRoomEventBtn").classList.toggle("hidden",!amHost());
@@ -705,7 +719,7 @@ async function createRoom(){
     remoteMode,
     teamEmojis:{},
     players:{[uid]:{name,seat:0,team:"A",online:true,joinedAt:now}},
-    game:{score:{A:0,B:0},round:0}
+    game:{score:emptyScore(limit),round:0}
   };
   await set(ref(db,`${ROOT}/${code}`),data);
   await enterRoom(code);
@@ -780,7 +794,7 @@ async function leaveRoom(){
         if(wasHost) room.hostUid=remaining[0].id;
         if(room.state!=="lobby"){
           room.state="lobby";
-          room.game={score:room.game?.score||{A:0,B:0},round:room.game?.round||0};
+          room.game={score:room.game?.score||emptyScore(maxPlayers(room)),round:room.game?.round||0};
         }
         room.updatedAt=Date.now();
         return room;
@@ -816,7 +830,7 @@ function buildRound(currentScore){
   for(const p of playersArray()) hands[p.id]=deck.splice(0,4);
   return {
     round:(roomData?.game?.round||0)+1,
-    score:currentScore||{A:0,B:0},
+    score:currentScore||emptyScore(),
     hands,
     table:deck.splice(0,4),
     deck,
@@ -831,12 +845,12 @@ function buildRound(currentScore){
 async function startGame(resetScore=false){
   const list=playersArray();
   const limit=maxPlayers();
-  const perTeam=limit/2;
-  const teamsReady=list.length===limit && list.every(p=>p.online!==false) && list.filter(p=>playerTeam(p)==="A").length===perTeam && list.filter(p=>playerTeam(p)==="B").length===perTeam;
-  const emojiA=roomData.teamEmojis?.A, emojiB=roomData.teamEmojis?.B;
-  const remoteReady=!roomData.remoteMode || (!!emojiA && !!emojiB && emojiA!==emojiB);
+  const teams=teamNames();
+  const teamsReady=list.length===limit && list.every(p=>p.online!==false) && teams.every(team=>list.filter(p=>playerTeam(p)===team).length===2);
+  const chosenEmojis=teams.map(team=>roomData.teamEmojis?.[team]).filter(Boolean);
+  const remoteReady=!roomData.remoteMode || (chosenEmojis.length===teams.length && new Set(chosenEmojis).size===teams.length);
   if(!amHost() || !teamsReady || !remoteReady) return;
-  const score=resetScore?{A:0,B:0}:(roomData.game?.score||{A:0,B:0});
+  const score=resetScore?emptyScore():(roomData.game?.score||emptyScore());
   const game=buildRound(score);
   await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game,updatedAt:Date.now()});
   selectedHand=selectedTable=null;
@@ -911,7 +925,7 @@ async function resolveCall(type){
     if(!caller) return;
     const callerTeam=playerTeam(caller);
     const allPlayers=Object.entries(room.players||{}).map(([id,p])=>({id,...p}));
-    let success=false, winnerTeam=null, text="";
+    let success=false, winnerTeam=null, penaltyTeam=null, text="";
 
     if(room.remoteMode){
       const sig=room.game?.signal;
@@ -919,13 +933,23 @@ async function resolveCall(type){
       if(type==="kent"){
         if(callerTeam!==sig.team || uid===sig.senderUid) return;
         success=hasFour(room.game.hands?.[sig.senderUid]);
-        winnerTeam=success?sig.team:otherTeam(sig.team);
-        text=success ? `${caller.name} poznal znamení a hlásí KENT` : `${caller.name} hlásí KENT chybně`;
+        if(success){
+          winnerTeam=sig.team;
+          text=`${caller.name} poznal znamení a hlásí KENT`;
+        }else{
+          penaltyTeam=callerTeam;
+          text=`${caller.name} hlásí KENT chybně`;
+        }
       }else{
         if(callerTeam===sig.team) return;
         success=hasFour(room.game.hands?.[sig.senderUid]);
-        winnerTeam=success?callerTeam:sig.team;
-        text=success ? `${caller.name} zachytil znamení a hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
+        if(success){
+          winnerTeam=callerTeam;
+          text=`${caller.name} zachytil znamení a hlásí KONTRA`;
+        }else{
+          winnerTeam=sig.team;
+          text=`${caller.name} hlásí KONTRA chybně`;
+        }
       }
       sig.resolved=true;
       sig.resolvedBy=uid;
@@ -934,19 +958,30 @@ async function resolveCall(type){
     }else{
       if(type==="kent"){
         success=allPlayers.some(p=>p.id!==uid && playerTeam(p)===callerTeam && hasFour(room.game.hands?.[p.id]));
-        winnerTeam=success?callerTeam:otherTeam(callerTeam);
-        text=success ? `${caller.name} správně hlásí KENT` : `${caller.name} hlásí KENT chybně`;
+        if(success){
+          winnerTeam=callerTeam;
+          text=`${caller.name} správně hlásí KENT`;
+        }else{
+          penaltyTeam=callerTeam;
+          text=`${caller.name} hlásí KENT chybně`;
+        }
       }else{
         success=allPlayers.some(p=>playerTeam(p)!==callerTeam && hasFour(room.game.hands?.[p.id]));
-        winnerTeam=success?callerTeam:otherTeam(callerTeam);
-        text=success ? `${caller.name} správně hlásí KONTRA` : `${caller.name} hlásí KONTRA chybně`;
+        if(success){
+          winnerTeam=callerTeam;
+          text=`${caller.name} správně hlásí KONTRA`;
+        }else{
+          penaltyTeam=callerTeam;
+          text=`${caller.name} hlásí KONTRA chybně`;
+        }
       }
     }
 
-    room.game.score=room.game.score||{A:0,B:0};
-    room.game.score[winnerTeam]=(room.game.score[winnerTeam]||0)+1;
-    room.game.lastEvent={title:type==="kent"?"KENT!":"KONTRA!",text,winnerTeam,by:uid,time:now};
-    room.state=room.game.score[winnerTeam]>=WIN_SCORE?"finished":"roundEnd";
+    room.game.score=room.game.score||emptyScore(maxPlayers(room));
+    if(winnerTeam) room.game.score[winnerTeam]=(room.game.score[winnerTeam]||0)+1;
+    if(penaltyTeam) room.game.score[penaltyTeam]=Math.max(0,(room.game.score[penaltyTeam]||0)-1);
+    room.game.lastEvent={title:type==="kent"?"KENT!":"KONTRA!",text,winnerTeam,penaltyTeam,by:uid,time:now};
+    room.state=Object.values(room.game.score).some(points=>Number(points)>=WIN_SCORE)?"finished":"roundEnd";
     room.updatedAt=now;
     return room;
   });
@@ -954,7 +989,7 @@ async function resolveCall(type){
 
 async function nextRound(){
   if(!amHost()) return;
-  const game=buildRound(roomData.game?.score||{A:0,B:0});
+  const game=buildRound(roomData.game?.score||emptyScore());
   await update(ref(db,`${ROOT}/${roomCode}`),{state:"playing",game,updatedAt:Date.now()});
   selectedHand=selectedTable=null;
   eventOverlay.classList.add("hidden");

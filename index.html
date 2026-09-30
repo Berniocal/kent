@@ -96,11 +96,13 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .emoji-choice.active{background:var(--accent);border-color:var(--accent)}
 .emoji-choice:disabled{opacity:.28;cursor:default}
 .signal-btn{margin-top:2px;background:rgba(241,196,77,.18);border-color:rgba(241,196,77,.55);font-size:16px}
-.signal-corner{position:fixed;z-index:4;top:max(76px,calc(env(safe-area-inset-top) + 64px));right:14px;width:64px;height:64px;border-radius:20px;border:1px solid rgba(255,255,255,.2);background:rgba(5,43,31,.82);backdrop-filter:blur(8px);display:grid;place-items:center;box-shadow:0 12px 30px rgba(0,0,0,.28);transition:opacity .12s,transform .12s;pointer-events:none}
+.contra-signal{display:grid;grid-template-columns:1fr;gap:6px;min-width:0}
+.contra-signal.remote{grid-template-columns:minmax(0,1fr) 52px}
+.contra-signal .btn{width:100%;min-width:0}
+.signal-corner{width:52px;min-height:54px;display:grid;place-items:center;pointer-events:none}
 .signal-corner.hidden{display:none!important}
-.signal-corner .signal-emoji{font-size:38px;line-height:1}
-.signal-corner.real{outline:2px solid rgba(241,196,77,.8);transform:scale(1.05)}
-@media(max-width:430px){.create-options{grid-template-columns:1fr}.emoji-choice{width:32px;height:32px;font-size:19px}.signal-corner{width:58px;height:58px;border-radius:18px;top:max(72px,calc(env(safe-area-inset-top) + 60px));right:10px}.signal-corner .signal-emoji{font-size:34px}}
+.signal-corner .signal-emoji{font-size:36px;line-height:1}
+@media(max-width:430px){.create-options{grid-template-columns:1fr}.emoji-choice{width:32px;height:32px;font-size:19px}.contra-signal.remote{grid-template-columns:minmax(0,1fr) 48px}.signal-corner{width:48px;min-height:49px}.signal-corner .signal-emoji{font-size:32px}}
 .corner{position:absolute;top:8px;left:9px;display:flex;flex-direction:column;align-items:center;line-height:.92;font-weight:900;font-size:clamp(17px,5vw,24px)}
 .corner.bottom{top:auto;left:auto;right:9px;bottom:8px;transform:rotate(180deg)}
 .corner .suit{font-size:.78em;margin-top:4px}
@@ -195,13 +197,15 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
       <div class="game-actions">
         <button class="btn" id="newTableBtn">Nové karty</button>
         <button class="btn accent" id="kentBtn">KENT!</button>
-        <button class="btn" id="contraBtn">KONTRA</button>
+        <div class="contra-signal" id="contraSignalWrap">
+          <button class="btn" id="contraBtn">KONTRA</button>
+          <div class="signal-corner hidden" id="signalCorner"><span class="signal-emoji" id="signalEmoji"></span></div>
+        </div>
       </div>
     </section>
   </section>
 </main>
 
-<div class="signal-corner hidden" id="signalCorner"><span class="signal-emoji" id="signalEmoji"></span></div>
 
 <div class="event-overlay hidden" id="eventOverlay">
   <div class="event-card">
@@ -257,7 +261,6 @@ const MOVE_NOTICE_MS = 1400;
 const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 const SIGNAL_DURATION_MS = 2500;
 const DECOY_SLOT_MS = 2500;
-const DECOY_VISIBLE_MS = 1750;
 const EMOJI_CHOICES = ["🐸","🦊","🐼","🐙","🦄","🐝","🍎","🍋","🍀","⭐","🔥","🌙","⚽","🎲","🚀","💎"];
 const DECOY_EMOJIS = ["😀","😎","🤓","🥳","🤖","👻","🐶","🐱","🐵","🦁","🐯","🐨","🐧","🦋","🌻","🌈","☀️","❄️","🍓","🍉","🥝","🍕","🍪","🎈","🎯","🎸","🚲","✈️","🧩","🔔",...EMOJI_CHOICES];
 const suits = ["♠","♥","♦","♣"];
@@ -561,27 +564,22 @@ function renderSignalCorner(){
   const sig=activeRemoteSignal(roomData,now);
   const myTeam=playerTeam(me());
   const signalBtn=$("signalBtn"), kentBtn=$("kentBtn"), contraBtn=$("contraBtn");
+  corner.classList.remove("hidden");
   if(sig){
-    corner.classList.remove("hidden");
-    corner.classList.add("real");
     emojiEl.textContent=sig.emoji||"";
     signalBtn.disabled=true;
     kentBtn.disabled=uid===sig.senderUid || myTeam!==sig.team;
     contraBtn.disabled=myTeam===sig.team;
     return;
   }
-  corner.classList.remove("real");
   signalBtn.disabled=false;
   kentBtn.disabled=true;
   contraBtn.disabled=true;
-  const phase=((now%DECOY_SLOT_MS)+DECOY_SLOT_MS)%DECOY_SLOT_MS;
-  if(phase>DECOY_VISIBLE_MS){corner.classList.add("hidden");return}
   const excluded=new Set(Object.values(roomData.teamEmojis||{}).filter(Boolean));
   const pool=DECOY_EMOJIS.filter(e=>!excluded.has(e));
   const slot=Math.floor(now/DECOY_SLOT_MS);
   const idx=pool.length?hashString(`${roomCode}:${slot}`)%pool.length:0;
   emojiEl.textContent=pool[idx]||"🙂";
-  corner.classList.remove("hidden");
 }
 
 async function sendSignal(){
@@ -622,7 +620,7 @@ function renderGame(){
   $("handLabel").textContent=`Tvoje karty · ${me().name}`;
 
   const lastMove=g.lastMove;
-  const moveAge=lastMove?.at ? Date.now()-lastMove.at : Infinity;
+  const moveAge=lastMove?.at ? serverNow()-lastMove.at : Infinity;
   const showMove=moveAge>=0 && moveAge<MOVE_NOTICE_MS;
   if(moveNoticeTimer){ clearTimeout(moveNoticeTimer); moveNoticeTimer=null; }
   if(showMove){
@@ -670,6 +668,7 @@ function renderGame(){
 
   const remote=!!roomData.remoteMode;
   const signalBtn=$("signalBtn");
+  $("contraSignalWrap")?.classList.toggle("remote",remote);
   signalBtn.classList.toggle("hidden",!remote);
   signalBtn.textContent=`SIGNÁL ${roomData.teamEmojis?.[playerTeam(me())]||""}`.trim();
   if(remote){
@@ -910,6 +909,7 @@ function selectTable(i){
 
 async function swapCards(){
   const hi=selectedHand, ti=selectedTable;
+  const moveTime=serverNow();
   selectedHand=selectedTable=null;
   await runTransaction(ref(db,`${ROOT}/${roomCode}`),room=>{
     if(!room || room.state!=="playing") return;
@@ -919,7 +919,7 @@ async function swapCards(){
     const taken=table[ti];
     const tmp=hand[hi]; hand[hi]=taken; table[ti]=tmp;
     room.game.turn=(room.game.turn||0)+1;
-    const now=Date.now();
+    const now=moveTime;
     room.game.lastMove={
       id:room.game.turn,
       by:uid,

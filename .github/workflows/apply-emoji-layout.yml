@@ -1,0 +1,36 @@
+name: Apply Kent emoji layout
+
+on:
+  push:
+    paths:
+      - '.kent-emoji-layout-trigger'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Kent
+        run: python3 .kent-emoji-layout-patch.py
+      - name: Check JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('index.html').read_text(encoding='utf-8')
+          m=re.search(r'<script type="module">(.*?)</script>',s,re.S)
+          assert m, 'module script not found'
+          Path('/tmp/kent-check.mjs').write_text(m.group(1),encoding='utf-8')
+          PY
+          node --check /tmp/kent-check.mjs
+      - name: Commit
+        run: |
+          git config user.name "Bernio"
+          git config user.email "jendabernard@gmail.com"
+          git add index.html
+          git rm .kent-emoji-layout-patch.py .kent-emoji-layout-trigger .github/workflows/apply-emoji-layout.yml
+          git commit -m "Keep remote Kent emoji continuous and inline"
+          git push
